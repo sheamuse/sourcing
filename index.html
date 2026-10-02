@@ -1,0 +1,1395 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>신상품 소싱 보드</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <style>
+:root {
+  --bg: #F2F3F1;
+  --surface: #FFFFFF;
+  --surface-2: #F7F8F6;
+  --ink: #17201D;
+  --muted: #66706C;
+  --line: #DDE1DC;
+  --line-strong: #C6CCC6;
+  --accent: #2346C8;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E7ECFB;
+  --danger: #A1342B;
+
+  --review: #8A5D00;  --review-bg: #FBF0D6;
+  --picked: #146B44;  --picked-bg: #DCF1E5;
+  --hold: #55605B;    --hold-bg: #E6E9E6;
+  --drop: #A1342B;    --drop-bg: #F8E1DE;
+
+  --radius: 12px;
+  --radius-sm: 7px;
+  --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+          "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111513;
+    --surface: #191E1C;
+    --surface-2: #1F2523;
+    --ink: #E8ECE9;
+    --muted: #99A29E;
+    --line: #2B3230;
+    --line-strong: #3B4440;
+    --accent: #8098FF;
+    --accent-ink: #0D1433;
+    --accent-soft: #222B4C;
+    --danger: #F08F86;
+    --review: #E8B95C;  --review-bg: #392E16;
+    --picked: #72D3A2;  --picked-bg: #163428;
+    --hold: #B4BCB8;    --hold-bg: #29302D;
+    --drop: #F08F86;    --drop-bg: #3B1F1C;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.muted { color: var(--muted); }
+.spacer { flex: 1; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- buttons & inputs ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 38px; padding: 0 14px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink);
+  font-weight: 600; font-size: 14px; text-decoration: none; white-space: nowrap;
+  cursor: pointer;
+}
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.ghost:hover { background: var(--surface-2); }
+.btn.danger { color: var(--danger); }
+.btn.small { height: 32px; padding: 0 10px; font-size: 13px; }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: .55; cursor: progress; }
+
+input[type=text], input[type=search], input[type=password], input[type=number], input[type=url],
+input:not([type]), select, textarea {
+  width: 100%;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--surface); padding: 9px 11px; font-size: 14px; font-weight: 400;
+}
+select { padding-right: 28px; }
+textarea { resize: vertical; line-height: 1.6; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ---------- login ---------- */
+.login { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.login-card {
+  width: min(360px, 100%); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 16px; padding: 32px 28px;
+  display: grid; gap: 12px;
+}
+.login-mark { font-size: 32px; }
+.login-card h1 { margin: 0; font-size: 22px; letter-spacing: -0.02em; }
+.login-card p { margin: 0; }
+.login-error { color: var(--danger); font-size: 13px; min-height: 1.2em; }
+
+/* ---------- topbar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px clamp(16px, 4vw, 40px);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; text-decoration: none; letter-spacing: -0.01em; }
+.brand-mark { font-size: 18px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.usage { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.usage-bar { width: 72px; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.usage-bar i { display: block; height: 100%; background: var(--accent); }
+
+.view { max-width: 1240px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 40px) 80px; }
+
+/* ---------- list ---------- */
+.list-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.list-head h1 { margin: 0; font-size: 28px; letter-spacing: -0.025em; line-height: 1.2; }
+.list-head p { margin: 4px 0 0; color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.tabs { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); overflow-x: auto; }
+.tabs button {
+  border: 0; background: transparent; border-radius: 7px; padding: 6px 12px;
+  font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+.tabs button[aria-selected=true] { background: var(--ink); color: var(--surface); }
+.tabs .count { font-size: 12px; font-weight: 500; opacity: .75; font-variant-numeric: tabular-nums; }
+.filters { display: flex; gap: 8px; flex: 1; justify-content: flex-end; min-width: 280px; }
+.filters input { max-width: 260px; }
+.filters select { width: auto; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
+.card {
+  display: flex; flex-direction: column; text-decoration: none;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+}
+.card:hover { border-color: var(--line-strong); }
+.card:hover h3 { text-decoration: underline; text-underline-offset: 3px; }
+.thumb { aspect-ratio: 4 / 3; background: var(--surface-2); display: grid; place-items: center; overflow: hidden; border-bottom: 1px solid var(--line); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; }
+.noimg { font-size: 13px; color: var(--muted); }
+.card-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.card-body h3 { margin: 0; font-size: 17px; letter-spacing: -0.015em; line-height: 1.35; }
+.excerpt { margin: 0; color: var(--muted); font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-foot { margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card-foot strong { color: var(--ink); font-weight: 600; }
+
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.s-review { color: var(--review); background: var(--review-bg); }
+.s-picked { color: var(--picked); background: var(--picked-bg); }
+.s-hold   { color: var(--hold);   background: var(--hold-bg); }
+.s-drop   { color: var(--drop);   background: var(--drop-bg); }
+.prio { font-size: 12px; font-weight: 700; color: var(--accent); }
+
+.empty { text-align: center; padding: 72px 20px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--surface); }
+.empty h2 { margin: 0 0 6px; font-size: 18px; }
+.empty p { margin: 0 0 18px; color: var(--muted); }
+
+/* ---------- detail ---------- */
+.crumb { margin-bottom: 14px; font-size: 14px; }
+.crumb a { color: var(--muted); text-decoration: none; }
+.crumb a:hover { color: var(--ink); }
+.detail-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
+.detail-head h1 { margin: 8px 0 0; font-size: clamp(24px, 3.2vw, 32px); letter-spacing: -0.03em; line-height: 1.2; }
+.head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.head-actions select { width: auto; height: 38px; padding-top: 0; padding-bottom: 0; font-weight: 600; }
+
+.detail-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 28px; align-items: start; }
+@media (max-width: 860px) { .detail-grid { grid-template-columns: 1fr; } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+
+.gallery { padding: 12px; }
+.gallery-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.gallery-grid .shot:first-child { grid-column: 1 / -1; aspect-ratio: 1 / 1; }
+.shot { position: relative; aspect-ratio: 1 / 1; border-radius: 8px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.shot > button.open { all: unset; cursor: zoom-in; display: block; width: 100%; height: 100%; }
+.shot img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.shot .img-copy {
+  position: absolute; right: 6px; bottom: 6px;
+  border: 0; border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 600;
+  background: rgba(23, 32, 29, .78); color: #fff; cursor: pointer; opacity: 0;
+}
+.shot:hover .img-copy, .shot:focus-within .img-copy { opacity: 1; }
+@media (hover: none) { .shot .img-copy { opacity: 1; } }
+.gallery-empty { aspect-ratio: 4 / 3; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: 14px; border: 1px dashed var(--line-strong); border-radius: 8px; padding: 20px; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 10px 2px 0; }
+kbd { font-family: inherit; font-size: 11.5px; padding: 1px 5px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--surface); }
+
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--line); }
+.facts > div { padding: 16px 18px; }
+.facts > div + div { border-left: 1px solid var(--line); }
+.facts span { display: block; font-size: 12.5px; color: var(--muted); }
+.facts strong { display: block; margin-top: 2px; font-size: 20px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.facts strong.good { color: var(--picked); }
+.facts strong.bad { color: var(--drop); }
+
+.note { padding: 18px 20px; }
+.note + .note { border-top: 1px solid var(--line); }
+.note h2 { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.prose { max-width: 68ch; white-space: normal; }
+.prose.lead { font-size: 16.5px; line-height: 1.7; }
+.prose .placeholder { color: var(--muted); font-style: normal; }
+
+/* ---------- compare ---------- */
+.compare { margin-top: 40px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.section-head h2 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+.section-head h2 span { font-weight: 500; color: var(--muted); font-size: 15px; margin-left: 4px; }
+
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+table.cmp { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 880px; }
+.cmp td.rating { white-space: nowrap; font-size: 13px; color: var(--muted); }
+.cmp th { text-align: left; font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--surface-2); white-space: nowrap; }
+.cmp td { padding: 12px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.cmp tr:last-child td { border-bottom: 0; }
+.cmp .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cmp tr.selected td { background: var(--accent-soft); }
+.cmp tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.site { font-weight: 700; white-space: nowrap; }
+.tag { display: inline-block; margin-top: 3px; font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.tag.best { color: var(--picked); background: var(--picked-bg); }
+.tag.chosen { color: var(--accent-ink); background: var(--accent); }
+.prod { display: flex; align-items: center; gap: 10px; min-width: 190px; }
+.prod img, .prod .ph { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex: none; border: 1px solid var(--line); background: var(--surface-2); }
+.prod-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
+.prod a.link { font-size: 12.5px; color: var(--accent); text-decoration: none; }
+.prod a.link:hover { text-decoration: underline; }
+
+/* the landed-cost bar: the one thing the eye should land on */
+.cost { min-width: 130px; }
+.cost-val { font-weight: 700; font-variant-numeric: tabular-nums; }
+.cost-bar { height: 6px; margin-top: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.cost-bar i { display: block; height: 100%; background: var(--line-strong); border-radius: 3px; }
+tr.best .cost-bar i { background: var(--picked); }
+tr.selected .cost-bar i { background: var(--accent); }
+.margin.good { color: var(--picked); font-weight: 600; }
+.margin.bad { color: var(--drop); font-weight: 600; }
+.row-actions { display: flex; gap: 4px; justify-content: flex-end; }
+
+.src-cards { align-items: start; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 16px; }
+.src-card { padding: 16px 18px; }
+.src-card header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.src-card h3 { margin: 0; font-size: 15px; }
+.src-card h3 small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.pc { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; font-size: 14px; }
+.pc h4 { margin: 0 0 3px; font-size: 12.5px; }
+.pc .pro h4 { color: var(--picked); }
+.pc .con h4 { color: var(--drop); }
+.src-memo { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+.src-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-top: 12px; }
+
+/* ---------- modal ---------- */
+.modal {
+  width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 32px);
+  padding: 0; border: 1px solid var(--line); border-radius: 16px;
+  background: var(--surface); color: var(--ink);
+}
+.modal::backdrop, .lightbox::backdrop { background: rgba(10, 14, 12, .5); }
+.modal form { display: flex; flex-direction: column; max-height: calc(100vh - 34px); }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
+.icon-btn { border: 0; background: transparent; font-size: 18px; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); }
+.modal-body { padding: 18px 22px; overflow-y: auto; display: grid; gap: 14px; }
+.modal-foot { display: flex; align-items: center; gap: 8px; padding: 14px 22px; border-top: 1px solid var(--line); background: var(--surface-2); border-radius: 0 0 16px 16px; }
+.modal label, .field { display: grid; gap: 5px; font-size: 13px; font-weight: 600; }
+.modal label small, .field small { font-weight: 400; color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+.row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.row4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 600px) { .row2, .row3, .row4 { grid-template-columns: 1fr 1fr; } .pc { grid-template-columns: 1fr; } }
+.check { display: flex !important; grid-template-columns: none; align-items: center; gap: 8px; font-weight: 600; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+/* uploader */
+.drop {
+  border: 1.5px dashed var(--line-strong); border-radius: 10px; padding: 18px;
+  text-align: center; font-size: 14px; font-weight: 500; color: var(--muted); cursor: pointer; background: var(--surface-2);
+}
+.drop strong { color: var(--ink); }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.up-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-top: 10px; }
+.up-thumb { position: relative; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+.up-thumb img { aspect-ratio: 1 / 1; width: 100%; object-fit: contain; }
+.up-thumb .cap { font-size: 11px; font-weight: 500; color: var(--muted); padding: 4px 6px; background: var(--surface); border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.up-thumb .cap.main { color: var(--accent); font-weight: 700; }
+.up-thumb .x, .up-thumb .star {
+  position: absolute; top: 4px; border: 0; width: 24px; height: 24px; border-radius: 6px;
+  background: rgba(23, 32, 29, .72); color: #fff; font-size: 13px; cursor: pointer; line-height: 1;
+}
+.up-thumb .x { right: 4px; }
+.up-thumb .star { left: 4px; }
+.up-thumb.busy img { opacity: .35; }
+.up-thumb.busy::after { content: "압축 중"; position: absolute; inset: 0 0 24px; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--ink); }
+
+/* lightbox */
+.lightbox { padding: 0; border: 0; background: transparent; max-width: 100vw; max-height: 100vh; width: 100vw; height: 100vh; }
+.lb { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; }
+.lb img { max-width: min(1100px, 100%); max-height: calc(100vh - 110px); object-fit: contain; background: #fff; border-radius: 8px; }
+.lb-bar { display: flex; align-items: center; gap: 8px; background: var(--surface); border-radius: 10px; padding: 6px 6px 6px 14px; color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.lb-nav { position: fixed; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--surface); color: var(--ink); font-size: 20px; cursor: pointer; }
+.lb-nav.prev { left: 16px; }
+.lb-nav.next { right: 16px; }
+
+/* toast */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px);
+  background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 10px;
+  font-size: 14px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  max-width: calc(100vw - 32px); z-index: 100;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.err { background: var(--danger); color: #fff; }
+
+.loading { padding: 80px 0; text-align: center; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .list-head { flex-direction: column; align-items: stretch; }
+  .filters { min-width: 0; flex-wrap: wrap; }
+  .filters input { max-width: none; }
+  .usage span:last-child { display: none; }
+  .facts strong { font-size: 17px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+</style>
+</head>
+<body>
+
+  <!-- 시작 안내: 스크립트가 실행되면 사라집니다 -->
+  <div id="boot" class="login"><div class="login-card">
+    <h1>신상품 소싱 보드</h1>
+    <p id="boot-msg" class="muted">불러오는 중…</p>
+  </div></div>
+  <script>
+    window.__bootFail = function (msg) {
+      var b = document.getElementById('boot'), m = document.getElementById('boot-msg');
+      if (!b || !m) { alert(msg); return; }
+      b.hidden = false; m.textContent = msg; m.style.color = '#A1342B';
+    };
+    window.addEventListener('error', function (e) { window.__bootFail('오류: ' + (e.message || '스크립트를 불러오지 못했습니다')); });
+    setTimeout(function () {
+      var b = document.getElementById('boot');
+      if (b && !b.hidden && document.getElementById('boot-msg').textContent === '불러오는 중…')
+        window.__bootFail('화면을 시작하지 못했습니다. 인터넷 연결과 config 설정을 확인해 주세요.');
+    }, 8000);
+  </script>
+
+  <!-- 비밀번호 화면 -->
+  <div id="login" class="login" hidden>
+    <form id="login-form" class="login-card" autocomplete="on">
+      <div class="login-mark" aria-hidden="true">📦</div>
+      <h1>신상품 소싱 보드</h1>
+      <p class="muted">팀 비밀번호를 입력하면 들어갈 수 있습니다.</p>
+      <label class="sr-only" for="pw">비밀번호</label>
+      <input id="pw" type="password" placeholder="비밀번호" autocomplete="current-password" required>
+      <p id="login-error" class="login-error" role="alert"></p>
+      <button class="btn primary block" type="submit">입장하기</button>
+    </form>
+  </div>
+
+  <!-- 앱 -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <a class="brand" href="#/">
+        <span class="brand-mark" aria-hidden="true">📦</span>
+        <span>신상품 소싱 보드</span>
+      </a>
+      <div class="topbar-right">
+        <div id="usage" class="usage" title="Supabase 무료 저장공간 1GB 기준"></div>
+        <button class="btn ghost small" data-act="logout">나가기</button>
+      </div>
+    </header>
+    <main id="view" class="view"></main>
+  </div>
+
+  <dialog id="modal" class="modal"></dialog>
+  <dialog id="lightbox" class="lightbox"></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script>
+/* ===== 설정: 여기만 수정하세요 ===== */
+// Supabase 프로젝트 정보를 넣어주세요. (README 3~5단계 참고)
+// anon(publishable) 키는 공개되어도 괜찮은 키입니다. 데이터는 비밀번호로 로그인해야만 보입니다.
+// 비밀번호 자체는 코드에 들어가지 않고 Supabase에만 저장됩니다.
+window.APP_CONFIG = {
+  SUPABASE_URL: 'https://YOUR_PROJECT_ID.supabase.co',
+  SUPABASE_ANON_KEY: 'YOUR_ANON_KEY',
+  // Supabase > Authentication > Users 에서 만든 팀 공용 계정의 이메일
+  TEAM_EMAIL: 'team@yourshop.com'
+};
+</script>
+  <script>
+(() => {
+  'use strict';
+
+  /* =========================================================
+     설정
+     ========================================================= */
+  const cfg = window.APP_CONFIG || {};
+  const BUCKET = 'product-images';
+  const STATUSES = ['검토중', '선정', '보류', '탈락'];
+  const STATUS_KEY = { '검토중': 'review', '선정': 'picked', '보류': 'hold', '탈락': 'drop' };
+  const PRIORITIES = ['높음', '보통', '낮음'];
+  const SITES = ['1688', '타오바오', '알리익스프레스', '테무', '쿠팡', '네이버 스마트스토어', '도매꾹', '도매매', '오너클랜', '아마존', '기타'];
+  const SITE_HOSTS = [
+    [/1688\.com/, '1688'], [/taobao\.com|tmall\.com/, '타오바오'], [/aliexpress\./, '알리익스프레스'],
+    [/temu\.com/, '테무'], [/coupang\.com/, '쿠팡'], [/smartstore\.naver|shopping\.naver|brand\.naver/, '네이버 스마트스토어'],
+    [/domeggook\.com/, '도매꾹'], [/domeme\.com/, '도매매'], [/ownerclan\.com/, '오너클랜'], [/amazon\./, '아마존']
+  ];
+
+  // 이미지 압축 기준: 긴 변 1600px, 장당 300KB 이하 WebP
+  const MAX_SIDE = 1600;
+  const TARGET_BYTES = 300 * 1024;
+  const STORAGE_LIMIT = 1024 * 1024 * 1024; // Supabase 무료 1GB
+
+  /* =========================================================
+     유틸
+     ========================================================= */
+  const $ = (s, el = document) => el.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const nl2br = (s) => esc(s).replace(/\n/g, '<br>');
+  const won = (n) => (n === null || n === undefined || n === '' || Number.isNaN(n)) ? '-' : Number(n).toLocaleString('ko-KR') + '원';
+  const size = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(b / 1024)) + 'KB';
+  const totalCost = (s) => (s.unit_price == null && s.shipping_fee == null) ? null : (s.unit_price || 0) + (s.shipping_fee || 0);
+  const marginPct = (target, cost) => (target && cost != null) ? Math.round(((target - cost) / target) * 1000) / 10 : null;
+  const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; } };
+  const guessSite = (url) => { const h = hostOf(url); const hit = SITE_HOSTS.find(([re]) => re.test(h)); return hit ? hit[1] : ''; };
+  const normUrl = (u) => { u = (u || '').trim(); if (!u) return null; return /^https?:\/\//i.test(u) ? u : 'https://' + u; };
+  const numOrNull = (v) => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/,/g, '')); return Number.isFinite(n) ? Math.round(n) : null; };
+  const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+
+  let toastTimer;
+  function toast(msg, isErr = false) {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.classList.toggle('err', isErr);
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), isErr ? 5000 : 2600);
+  }
+
+  /* =========================================================
+     설정 확인 & Supabase
+     ========================================================= */
+  if (!window.supabase || !window.supabase.createClient) {
+    window.__bootFail('Supabase 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하거나, 파일을 직접 열지 말고 GitHub Pages 주소로 접속해 주세요.');
+    return;
+  }
+  if (!cfg.SUPABASE_URL || /YOUR_/.test(cfg.SUPABASE_URL) || /YOUR_/.test(cfg.SUPABASE_ANON_KEY || '')) {
+    document.body.innerHTML = `
+      <div class="login"><div class="login-card">
+        <h1>설정이 필요합니다</h1>
+        <p class="muted">index.html 위쪽의 <b>설정</b> 부분(window.APP_CONFIG)에 Supabase URL, anon 키, 팀 계정 이메일을 넣어주세요. 자세한 방법은 README.md 5단계에 있습니다.</p>
+      </div></div>`;
+    return;
+  }
+  const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true }
+  });
+
+  const state = { candidates: [], sources: [], status: 'all', q: '', category: '', sort: 'new' };
+  let activeUploader = null;
+  const view = $('#view');
+  const modal = $('#modal');
+  const lightbox = $('#lightbox');
+
+  /* =========================================================
+     로그인 (팀 공용 계정 + 비밀번호)
+     ========================================================= */
+  function showLogin() {
+    $('#boot').hidden = true;
+    $('#app').hidden = true;
+    $('#login').hidden = false;
+    setTimeout(() => $('#pw').focus(), 0);
+  }
+
+  $('#login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    const err = $('#login-error');
+    err.textContent = '';
+    btn.disabled = true;
+    const { error } = await sb.auth.signInWithPassword({ email: cfg.TEAM_EMAIL, password: $('#pw').value });
+    btn.disabled = false;
+    if (error) {
+      err.textContent = /invalid/i.test(error.message) ? '비밀번호가 맞지 않습니다.' : '들어가지 못했습니다: ' + error.message;
+      $('#pw').select();
+      return;
+    }
+    $('#pw').value = '';
+    startApp();
+  });
+
+  sb.auth.onAuthStateChange((event) => { if (event === 'SIGNED_OUT') showLogin(); });
+
+  async function startApp() {
+    $('#boot').hidden = true;
+    $('#login').hidden = true;
+    $('#app').hidden = false;
+    view.innerHTML = '<div class="loading">불러오는 중…</div>';
+    await loadAll();
+    await route();
+    refreshUsage();
+  }
+
+  /* =========================================================
+     데이터
+     ========================================================= */
+  async function loadAll() {
+    const [c, s] = await Promise.all([
+      sb.from('candidates').select('*').order('created_at', { ascending: false }),
+      sb.from('sources').select('*').order('created_at', { ascending: true })
+    ]);
+    if (c.error || s.error) {
+      toast('데이터를 불러오지 못했습니다: ' + (c.error || s.error).message, true);
+      return;
+    }
+    state.candidates = c.data || [];
+    state.sources = s.data || [];
+  }
+
+  const sourcesOf = (id) => state.sources.filter((s) => s.candidate_id === id);
+  const coverOf = (c) => (c.images && c.images[0]) || sourcesOf(c.id).flatMap((s) => s.images || [])[0] || null;
+  const bestCostOf = (id) => {
+    const srcs = sourcesOf(id);
+    const chosen = srcs.find((s) => s.is_selected);
+    if (chosen && totalCost(chosen) != null) return { cost: totalCost(chosen), chosen: true };
+    const costs = srcs.map(totalCost).filter((v) => v != null);
+    return costs.length ? { cost: Math.min(...costs), chosen: false } : null;
+  };
+
+  /* =========================================================
+     이미지: 서명 URL 캐시
+     ========================================================= */
+  const urlCache = new Map();
+  const URL_TTL = 60 * 60 * 6; // 6시간
+
+  async function ensureUrls(paths) {
+    const now = Date.now();
+    const need = [...new Set(paths.filter(Boolean))].filter((p) => !(urlCache.get(p)?.exp > now + 60000));
+    for (let i = 0; i < need.length; i += 100) {
+      const chunk = need.slice(i, i + 100);
+      const { data, error } = await sb.storage.from(BUCKET).createSignedUrls(chunk, URL_TTL);
+      if (error) { console.warn(error); continue; }
+      data.forEach((d) => { if (d.signedUrl) urlCache.set(d.path, { url: d.signedUrl, exp: now + URL_TTL * 1000 }); });
+    }
+  }
+  const imgUrl = (p) => urlCache.get(p)?.url || '';
+
+  async function removeFiles(paths) {
+    const list = (paths || []).filter(Boolean);
+    if (!list.length) return;
+    const { error } = await sb.storage.from(BUCKET).remove(list);
+    if (error) console.warn('이미지 삭제 실패', error);
+    list.forEach((p) => urlCache.delete(p));
+    refreshUsage();
+  }
+
+  async function refreshUsage() {
+    let total = 0, count = 0, offset = 0;
+    for (;;) {
+      const { data, error } = await sb.storage.from(BUCKET).list('img', { limit: 1000, offset });
+      if (error || !data) break;
+      data.forEach((o) => { if (o.metadata?.size) { total += o.metadata.size; count++; } });
+      if (data.length < 1000) break;
+      offset += 1000;
+    }
+    const pct = Math.min(100, (total / STORAGE_LIMIT) * 100);
+    $('#usage').innerHTML = `
+      <span class="usage-bar" aria-hidden="true"><i style="width:${Math.max(pct, total ? 1 : 0)}%"></i></span>
+      <span>이미지 ${count}장 · ${size(total)} / 1GB</span>`;
+  }
+
+  /* =========================================================
+     이미지 압축 (브라우저에서 WebP로 변환)
+     ========================================================= */
+  async function loadBitmap(blob) {
+    if ('createImageBitmap' in window) {
+      try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); } catch { /* fall through */ }
+    }
+    return await new Promise((res, rej) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); res(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('이미지를 읽을 수 없습니다')); };
+      img.src = url;
+    });
+  }
+
+  function canvasToBlob(canvas, type, q) {
+    return new Promise((res) => canvas.toBlob(res, type, q));
+  }
+
+  async function compressImage(file) {
+    const bmp = await loadBitmap(file);
+    const w0 = bmp.width, h0 = bmp.height;
+    let maxSide = MAX_SIDE, quality = 0.82, blob = null;
+    for (let i = 0; i < 10; i++) {
+      const scale = Math.min(1, maxSide / Math.max(w0, h0));
+      const w = Math.max(1, Math.round(w0 * scale)), h = Math.max(1, Math.round(h0 * scale));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(bmp, 0, 0, w, h);
+      blob = await canvasToBlob(c, 'image/webp', quality);
+      if (!blob || blob.type !== 'image/webp') blob = await canvasToBlob(c, 'image/jpeg', quality); // WebP 미지원 브라우저
+      if (blob.size <= TARGET_BYTES) break;
+      if (quality > 0.6) quality -= 0.08; else maxSide = Math.round(maxSide * 0.82);
+    }
+    if (bmp.close) bmp.close();
+    return blob;
+  }
+
+  async function uploadBlob(blob) {
+    const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
+    const id = (crypto.randomUUID && crypto.randomUUID()) || (Date.now() + '-' + Math.random().toString(36).slice(2));
+    const path = `img/${id}.${ext}`;
+    const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false });
+    if (error) throw error;
+    return path;
+  }
+
+  function imageFilesFrom(dataTransfer) {
+    if (!dataTransfer) return [];
+    const out = [];
+    for (const item of dataTransfer.items || []) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) { const f = item.getAsFile(); if (f) out.push(f); }
+    }
+    if (!out.length && dataTransfer.files) for (const f of dataTransfer.files) if (f.type.startsWith('image/')) out.push(f);
+    return out;
+  }
+
+  /* =========================================================
+     이미지 복사 (클립보드)
+     ========================================================= */
+  async function copyImage(path) {
+    const url = imgUrl(path);
+    if (!url || !navigator.clipboard || !window.ClipboardItem) {
+      toast('이 브라우저는 이미지 복사를 지원하지 않습니다. 이미지를 우클릭해 복사해 주세요.', true);
+      return;
+    }
+    try {
+      const png = fetch(url).then((r) => r.blob()).then(async (b) => {
+        const bmp = await loadBitmap(b);
+        const c = document.createElement('canvas');
+        c.width = bmp.width; c.height = bmp.height;
+        c.getContext('2d').drawImage(bmp, 0, 0);
+        return canvasToBlob(c, 'image/png');
+      });
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+      toast('이미지를 복사했습니다. 원하는 곳에 붙여넣으세요.');
+    } catch (err) {
+      console.warn(err);
+      toast('이미지를 복사하지 못했습니다. 이미지를 우클릭해 복사해 주세요.', true);
+    }
+  }
+
+  /* =========================================================
+     업로더 (붙여넣기 / 끌어놓기 / 파일 선택)
+     ========================================================= */
+  function createUploader(root, initialPaths = []) {
+    let items = initialPaths.map((p) => ({ path: p, url: imgUrl(p) }));
+    const removed = [];
+    const uploaded = [];
+
+    root.innerHTML = `
+      <div class="drop" tabindex="0" role="button" aria-label="이미지 추가">
+        <strong>Ctrl+V로 붙여넣기</strong>, 끌어다 놓기, 또는 클릭해서 파일 선택
+        <input type="file" accept="image/*" multiple hidden>
+      </div>
+      <div class="up-thumbs"></div>
+      <p class="hint">올리기 전에 자동으로 압축됩니다 (긴 변 ${MAX_SIDE}px, 장당 약 ${Math.round(TARGET_BYTES / 1024)}KB 이하). 첫 번째 이미지가 대표 이미지입니다.</p>`;
+    const drop = root.querySelector('.drop');
+    const input = root.querySelector('input');
+    const thumbs = root.querySelector('.up-thumbs');
+
+    function render() {
+      thumbs.innerHTML = items.map((it, i) => `
+        <div class="up-thumb ${it.busy ? 'busy' : ''}">
+          ${it.url ? `<img src="${esc(it.url)}" alt="">` : '<img alt="">'}
+          ${i > 0 && !it.busy ? `<button type="button" class="star" data-i="${i}" title="대표 이미지로">★</button>` : ''}
+          ${!it.busy ? `<button type="button" class="x" data-i="${i}" title="빼기" aria-label="이미지 빼기">✕</button>` : ''}
+          <div class="cap ${i === 0 ? 'main' : ''}">${i === 0 ? '대표 · ' : ''}${it.blob ? `${size(it.orig)} → ${size(it.blob.size)}` : '저장됨'}</div>
+        </div>`).join('');
+    }
+
+    thumbs.addEventListener('click', (e) => {
+      const x = e.target.closest('.x'), star = e.target.closest('.star');
+      if (x) {
+        const [it] = items.splice(+x.dataset.i, 1);
+        if (it.path) removed.push(it.path);
+        if (it.blob && it.url) URL.revokeObjectURL(it.url);
+        render();
+      } else if (star) {
+        const [it] = items.splice(+star.dataset.i, 1);
+        items.unshift(it);
+        render();
+      }
+    });
+
+    async function addFiles(files) {
+      for (const f of files) {
+        if (!f.type.startsWith('image/')) continue;
+        const it = { busy: true, orig: f.size };
+        items.push(it);
+        render();
+        try {
+          const blob = await compressImage(f);
+          it.blob = blob;
+          it.url = URL.createObjectURL(blob);
+          it.busy = false;
+        } catch (err) {
+          items = items.filter((x) => x !== it);
+          toast('이미지를 읽지 못했습니다: ' + err.message, true);
+        }
+        render();
+      }
+    }
+
+    drop.addEventListener('click', () => input.click());
+    drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', () => { addFiles([...input.files]); input.value = ''; });
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); addFiles(imageFilesFrom(e.dataTransfer)); });
+
+    render();
+
+    return {
+      addFiles,
+      busy: () => items.some((i) => i.busy),
+      removed: () => removed,
+      uploaded: () => uploaded,
+      async commit() {
+        for (const it of items) {
+          if (it.blob && !it.path) {
+            it.path = await uploadBlob(it.blob);
+            uploaded.push(it.path);
+          }
+        }
+        return items.map((i) => i.path);
+      },
+      dispose() { items.forEach((i) => { if (i.blob && i.url) URL.revokeObjectURL(i.url); }); }
+    };
+  }
+
+  // 어디서든 Ctrl+V: 모달이 열려 있으면 업로더로, 상세 화면이면 바로 그 후보에 추가
+  document.addEventListener('paste', async (e) => {
+    const files = imageFilesFrom(e.clipboardData);
+    const html = e.clipboardData?.getData('text/html') || '';
+    if (!files.length) {
+      const inContext = (modal.open && activeUploader) || (!modal.open && currentDetailId());
+      if (inContext && /<img/i.test(html) && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
+        toast('글과 함께 복사된 이미지는 가져올 수 없습니다. 이미지를 우클릭 → "이미지 복사" 후 붙여넣어 주세요.', true);
+      }
+      return;
+    }
+    if (modal.open && activeUploader) { e.preventDefault(); activeUploader.addFiles(files); return; }
+    const id = currentDetailId();
+    if (id && !lightbox.open) { e.preventDefault(); await quickAddImages(id, files); }
+  });
+
+  async function quickAddImages(id, files) {
+    const c = state.candidates.find((x) => x.id === id);
+    if (!c) return;
+    toast(`이미지 ${files.length}장 압축 중…`);
+    try {
+      let orig = 0, after = 0;
+      const paths = [];
+      for (const f of files) {
+        const blob = await compressImage(f);
+        orig += f.size; after += blob.size;
+        paths.push(await uploadBlob(blob));
+      }
+      const images = [...(c.images || []), ...paths];
+      const { error } = await sb.from('candidates').update({ images }).eq('id', id);
+      if (error) { await removeFiles(paths); throw error; }
+      c.images = images;
+      toast(`이미지 ${paths.length}장 추가됨 (${size(orig)} → ${size(after)})`);
+      await renderDetail(id);
+      refreshUsage();
+    } catch (err) {
+      toast('이미지를 추가하지 못했습니다: ' + err.message, true);
+    }
+  }
+
+  /* =========================================================
+     라우팅
+     ========================================================= */
+  function currentDetailId() {
+    const m = location.hash.match(/^#\/c\/([\w-]+)/);
+    return m ? m[1] : null;
+  }
+  async function route() {
+    const id = currentDetailId();
+    if (id) await renderDetail(id); else renderList();
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', route);
+
+  /* =========================================================
+     목록 화면
+     ========================================================= */
+  function renderList() {
+    const counts = Object.fromEntries(STATUSES.map((s) => [s, state.candidates.filter((c) => c.status === s).length]));
+    const cats = [...new Set(state.candidates.map((c) => c.category).filter(Boolean))].sort();
+    if (state.category && !cats.includes(state.category)) state.category = '';
+
+    view.innerHTML = `
+      <section class="list-head">
+        <div>
+          <h1>신상품 후보</h1>
+          <p>후보 ${state.candidates.length}개 중 ${counts['선정']}개 선정</p>
+        </div>
+        <button class="btn primary" data-act="new-candidate">후보 추가</button>
+      </section>
+      <div class="toolbar">
+        <div class="tabs" role="tablist">
+          ${['all', ...STATUSES].map((s) => `
+            <button role="tab" aria-selected="${state.status === s}" data-act="filter-status" data-v="${s}">
+              ${s === 'all' ? '전체' : s}<span class="count">${s === 'all' ? state.candidates.length : counts[s]}</span>
+            </button>`).join('')}
+        </div>
+        <div class="filters">
+          <input type="search" id="q" placeholder="상품명, 선정 이유, 메모 검색" value="${esc(state.q)}" aria-label="검색">
+          <select id="cat" aria-label="카테고리">
+            <option value="">모든 카테고리</option>
+            ${cats.map((c) => `<option ${c === state.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+          </select>
+          <select id="sort" aria-label="정렬">
+            <option value="new" ${state.sort === 'new' ? 'selected' : ''}>최근 추가순</option>
+            <option value="updated" ${state.sort === 'updated' ? 'selected' : ''}>최근 수정순</option>
+            <option value="priority" ${state.sort === 'priority' ? 'selected' : ''}>우선순위순</option>
+          </select>
+        </div>
+      </div>
+      <div id="grid"></div>`;
+
+    $('#q').addEventListener('input', debounce((e) => { state.q = e.target.value; renderGrid(); }, 150));
+    $('#cat').addEventListener('change', (e) => { state.category = e.target.value; renderGrid(); });
+    $('#sort').addEventListener('change', (e) => { state.sort = e.target.value; renderGrid(); });
+    renderGrid();
+  }
+
+  async function renderGrid() {
+    const q = state.q.trim().toLowerCase();
+    let list = state.candidates.filter((c) =>
+      (state.status === 'all' || c.status === state.status) &&
+      (!state.category || c.category === state.category) &&
+      (!q || [c.title, c.category, c.reason, c.memo, c.target_customer].join(' ').toLowerCase().includes(q)));
+
+    if (state.sort === 'updated') list = [...list].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    if (state.sort === 'priority') list = [...list].sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority) || b.created_at.localeCompare(a.created_at));
+
+    const grid = $('#grid');
+    if (!grid) return;
+
+    if (!state.candidates.length) {
+      grid.innerHTML = `
+        <div class="empty">
+          <h2>아직 후보가 없습니다</h2>
+          <p>들여올 만한 상품을 발견하면 후보로 추가하고, 선정 이유와 소싱처 링크를 정리해 보세요.</p>
+          <button class="btn primary" data-act="new-candidate">첫 후보 추가</button>
+        </div>`;
+      return;
+    }
+    if (!list.length) {
+      grid.innerHTML = `<div class="empty"><h2>조건에 맞는 후보가 없습니다</h2><p>검색어나 상태 필터를 바꿔 보세요.</p></div>`;
+      return;
+    }
+
+    await ensureUrls(list.map(coverOf));
+    grid.innerHTML = `<div class="grid">${list.map(cardHTML).join('')}</div>`;
+  }
+
+  function cardHTML(c) {
+    const cover = coverOf(c);
+    const n = sourcesOf(c.id).length;
+    const best = bestCostOf(c.id);
+    return `
+      <a class="card" href="#/c/${c.id}">
+        <div class="thumb">${cover && imgUrl(cover) ? `<img src="${esc(imgUrl(cover))}" alt="" loading="lazy">` : '<span class="noimg">이미지 없음</span>'}</div>
+        <div class="card-body">
+          <div class="meta">
+            <span class="pill s-${STATUS_KEY[c.status]}">${esc(c.status)}</span>
+            ${c.priority === '높음' ? '<span class="prio">우선</span>' : ''}
+            ${c.category ? `<span>${esc(c.category)}</span>` : ''}
+          </div>
+          <h3>${esc(c.title)}</h3>
+          <p class="excerpt">${esc(c.reason || '선정 이유를 아직 적지 않았습니다.')}</p>
+          <div class="card-foot">
+            <span>소싱처 ${n}곳</span>
+            ${best ? `<span>${best.chosen ? '선택 원가' : '최저 원가'} <strong>${won(best.cost)}</strong></span>` : ''}
+          </div>
+        </div>
+      </a>`;
+  }
+
+  /* =========================================================
+     상세 화면
+     ========================================================= */
+  function shotsHTML(paths) {
+    const set = esc(JSON.stringify(paths));
+    return paths.map((p, i) => `
+      <div class="shot">
+        <button type="button" class="open" data-act="open-lightbox" data-set="${set}" data-i="${i}" aria-label="크게 보기">
+          <img src="${esc(imgUrl(p))}" alt="" loading="lazy">
+        </button>
+        <button type="button" class="img-copy" data-act="copy-image" data-path="${esc(p)}">복사</button>
+      </div>`).join('');
+  }
+
+  async function renderDetail(id) {
+    const c = state.candidates.find((x) => x.id === id);
+    if (!c) {
+      view.innerHTML = `<div class="empty"><h2>후보를 찾을 수 없습니다</h2><p>삭제되었거나 주소가 잘못되었습니다.</p><a class="btn" href="#/">목록으로</a></div>`;
+      return;
+    }
+    const srcs = sourcesOf(id).map((s) => ({ ...s, total: totalCost(s) }));
+    await ensureUrls([...(c.images || []), ...srcs.flatMap((s) => s.images || [])]);
+
+    const costs = srcs.map((s) => s.total).filter((v) => v != null);
+    const minCost = costs.length ? Math.min(...costs) : null;
+    const maxCost = costs.length ? Math.max(...costs) : null;
+    const sorted = [...srcs].sort((a, b) => (b.is_selected - a.is_selected) || ((a.total ?? Infinity) - (b.total ?? Infinity)));
+    const best = bestCostOf(id);
+    const m = best ? marginPct(c.target_price, best.cost) : null;
+
+    const para = (txt, ph) => txt ? nl2br(txt) : `<span class="placeholder">${ph}</span>`;
+
+    view.innerHTML = `
+      <nav class="crumb"><a href="#/">← 목록으로</a></nav>
+      <header class="detail-head">
+        <div>
+          <div class="meta">
+            <span class="pill s-${STATUS_KEY[c.status]}">${esc(c.status)}</span>
+            ${c.category ? `<span>${esc(c.category)}</span>` : ''}
+            <span>우선순위 ${esc(c.priority)}</span>
+          </div>
+          <h1>${esc(c.title)}</h1>
+        </div>
+        <div class="head-actions">
+          <select data-act="quick-status" aria-label="상태 바꾸기">
+            ${STATUSES.map((s) => `<option ${s === c.status ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+          <button class="btn" data-act="edit-candidate">수정</button>
+          <button class="btn ghost danger" data-act="delete-candidate">삭제</button>
+        </div>
+      </header>
+
+      <div class="detail-grid">
+        <section class="panel gallery">
+          ${(c.images || []).length
+            ? `<div class="gallery-grid">${shotsHTML(c.images)}</div>`
+            : `<div class="gallery-empty">상품 이미지를 복사한 뒤<br>이 화면에서 <kbd>Ctrl</kbd>+<kbd>V</kbd> 하면 바로 올라갑니다.</div>`}
+          <p class="hint">이 화면에서 <kbd>Ctrl</kbd>+<kbd>V</kbd>로 이미지를 붙여넣으면 자동 압축 후 추가됩니다. 이미지에 마우스를 올리면 복사할 수 있습니다.</p>
+        </section>
+
+        <section class="panel">
+          <div class="facts">
+            <div><span>목표 판매가</span><strong>${won(c.target_price)}</strong></div>
+            <div><span>${best?.chosen ? '선택한 소싱처 원가' : '최저 원가'}</span><strong>${best ? won(best.cost) : '-'}</strong></div>
+            <div><span>예상 마진율</span><strong class="${m == null ? '' : m >= 30 ? 'good' : m < 10 ? 'bad' : ''}">${m == null ? '-' : m + '%'}</strong></div>
+          </div>
+          <article class="note"><h2>선정 이유</h2><div class="prose lead">${para(c.reason, '왜 이 상품이어야 하는지 아직 적지 않았습니다.')}</div></article>
+          <article class="note"><h2>타깃 고객</h2><div class="prose">${para(c.target_customer, '-')}</div></article>
+          <article class="note"><h2>경쟁 상품 · 리스크</h2><div class="prose">${para(c.risks, '-')}</div></article>
+          ${c.memo ? `<article class="note"><h2>메모</h2><div class="prose">${nl2br(c.memo)}</div></article>` : ''}
+        </section>
+      </div>
+
+      <section class="compare">
+        <div class="section-head">
+          <h2>소싱처 비교<span>${srcs.length}곳</span></h2>
+          <button class="btn primary" data-act="new-source">소싱처 추가</button>
+        </div>
+        ${srcs.length ? `
+          <div class="table-wrap">
+            <table class="cmp">
+              <thead><tr>
+                <th>사이트</th><th>상품</th><th class="num">단가</th><th class="num">배송비</th>
+                <th>총 원가</th><th class="num">예상 마진율</th><th class="num">MOQ</th><th class="num">배송</th><th>평점 · 후기</th><th></th>
+              </tr></thead>
+              <tbody>
+                ${sorted.map((s) => {
+                  const isBest = s.total != null && s.total === minCost && costs.length > 1;
+                  const mm = marginPct(c.target_price, s.total);
+                  const pct = s.total != null && maxCost ? Math.max(4, (s.total / maxCost) * 100) : 0;
+                  const thumb = s.images?.[0];
+                  return `
+                  <tr class="${s.is_selected ? 'selected' : ''} ${isBest ? 'best' : ''}">
+                    <td>
+                      <div class="site">${esc(s.site)}</div>
+                      ${s.is_selected ? '<span class="tag chosen">최종 선택</span>' : isBest ? '<span class="tag best">최저가</span>' : ''}
+                    </td>
+                    <td>
+                      <div class="prod">
+                        ${thumb ? `<img src="${esc(imgUrl(thumb))}" alt="">` : '<span class="ph"></span>'}
+                        <div>
+                          <div class="prod-name">${esc(s.product_name || '(상품명 없음)')}</div>
+                          ${s.url ? `<a class="link" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(s.url) || '링크')} 열기 ↗</a>` : ''}
+                        </div>
+                      </div>
+                    </td>
+                    <td class="num">${won(s.unit_price)}</td>
+                    <td class="num">${won(s.shipping_fee)}</td>
+                    <td class="cost">
+                      <div class="cost-val">${won(s.total)}</div>
+                      ${s.total != null ? `<div class="cost-bar"><i style="width:${pct}%"></i></div>` : ''}
+                    </td>
+                    <td class="num"><span class="margin ${mm == null ? '' : mm >= 30 ? 'good' : mm < 10 ? 'bad' : ''}">${mm == null ? '-' : mm + '%'}</span></td>
+                    <td class="num">${s.moq ? s.moq.toLocaleString('ko-KR') + '개' : '-'}</td>
+                    <td class="num">${s.lead_days ? s.lead_days + '일' : '-'}</td>
+                    <td class="rating">${esc(s.rating || '-')}</td>
+                    <td>
+                      <div class="row-actions">
+                        <button class="btn small ${s.is_selected ? '' : 'ghost'}" data-act="toggle-select" data-id="${s.id}">${s.is_selected ? '선택 해제' : '최종 선택'}</button>
+                        <button class="btn small ghost" data-act="edit-source" data-id="${s.id}">수정</button>
+                      </div>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          <p class="hint">총 원가 = 단가 + 배송비. 마진율은 목표 판매가 기준이며 수수료·관부가세는 포함되지 않았습니다.</p>
+
+          <div class="src-cards">
+            ${sorted.map((s) => `
+              <article class="panel src-card">
+                <header>
+                  <h3>${esc(s.site)}<small>${esc(s.product_name || '')}</small></h3>
+                  <button class="btn small ghost" data-act="edit-source" data-id="${s.id}">수정</button>
+                </header>
+                ${(s.pros || s.cons) ? `
+                  <div class="pc">
+                    <div class="pro"><h4>장점</h4>${para(s.pros, '-')}</div>
+                    <div class="con"><h4>단점</h4>${para(s.cons, '-')}</div>
+                  </div>` : ''}
+                ${s.memo ? `<p class="src-memo">${nl2br(s.memo)}</p>` : ''}
+                ${(s.images || []).length ? `<div class="src-shots">${shotsHTML(s.images)}</div>` : ''}
+              </article>`).join('')}
+          </div>
+        ` : `
+          <div class="empty">
+            <h2>아직 소싱처가 없습니다</h2>
+            <p>1688, 도매꾹, 쿠팡 등에서 찾은 상품 링크를 추가하면 가격과 조건을 나란히 비교할 수 있습니다.</p>
+            <button class="btn primary" data-act="new-source">소싱처 추가</button>
+          </div>`}
+      </section>`;
+  }
+
+  /* =========================================================
+     모달 공통
+     ========================================================= */
+  function openModal(html, onSubmit, uploaderPaths) {
+    modal.innerHTML = html;
+    const form = modal.querySelector('form');
+    const upRoot = modal.querySelector('.uploader');
+    activeUploader = upRoot ? createUploader(upRoot, uploaderPaths || []) : null;
+    const uploader = activeUploader;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (uploader?.busy()) { toast('이미지 압축이 끝날 때까지 잠시 기다려 주세요.'); return; }
+      const btn = form.querySelector('button[type=submit]');
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '저장 중…';
+      try {
+        const images = uploader ? await uploader.commit() : undefined;
+        await onSubmit(Object.fromEntries(new FormData(form)), images, form);
+        if (uploader) await removeFiles(uploader.removed());
+        closeModal();
+        refreshUsage();
+      } catch (err) {
+        console.error(err);
+        if (uploader) await removeFiles(uploader.uploaded());
+        toast('저장하지 못했습니다: ' + (err.message || err), true);
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    });
+    modal.showModal();
+    form.querySelector('input:not([type=hidden]), textarea')?.focus();
+  }
+
+  function closeModal() {
+    activeUploader?.dispose();
+    activeUploader = null;
+    if (modal.open) modal.close();
+  }
+  modal.addEventListener('close', () => { activeUploader?.dispose(); activeUploader = null; });
+  modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
+
+  /* ---------- 후보 폼 ---------- */
+  function openCandidateForm(c) {
+    const cats = [...new Set(state.candidates.map((x) => x.category).filter(Boolean))];
+    const v = (k) => esc(c?.[k] ?? '');
+    openModal(`
+      <form novalidate>
+        <header class="modal-head">
+          <h2>${c ? '후보 수정' : '새 후보 추가'}</h2>
+          <button type="button" class="icon-btn" data-close aria-label="닫기">✕</button>
+        </header>
+        <div class="modal-body">
+          <div class="row2">
+            <label>상품명 <input name="title" required value="${v('title')}" placeholder="예: 리넨 오버핏 셔츠"></label>
+            <label>카테고리 <input name="category" list="cat-list" value="${v('category')}" placeholder="예: 상의">
+              <datalist id="cat-list">${cats.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></label>
+          </div>
+          <div class="row3">
+            <label>상태 <select name="status">${STATUSES.map((s) => `<option ${s === (c?.status || '검토중') ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+            <label>우선순위 <select name="priority">${PRIORITIES.map((s) => `<option ${s === (c?.priority || '보통') ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+            <label>목표 판매가 <small>원</small><input name="target_price" inputmode="numeric" value="${c?.target_price ?? ''}" placeholder="29000"></label>
+          </div>
+          <label>선정 이유 <small>왜 이 상품을 들여와야 하는지</small>
+            <textarea name="reason" rows="6" placeholder="수요·트렌드 근거, 기존 상품과의 연결, 시즌성, 가격 경쟁력 등">${v('reason')}</textarea></label>
+          <label>타깃 고객 <textarea name="target_customer" rows="2" placeholder="누가, 어떤 상황에서 살까요?">${v('target_customer')}</textarea></label>
+          <label>경쟁 상품 · 리스크 <textarea name="risks" rows="3" placeholder="비슷한 상품 판매처, 가격대, 반품·불량·인증 이슈 등">${v('risks')}</textarea></label>
+          <label>메모 <textarea name="memo" rows="2">${v('memo')}</textarea></label>
+          <div class="field">이미지 <div class="uploader"></div></div>
+        </div>
+        <footer class="modal-foot">
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close>취소</button>
+          <button type="submit" class="btn primary">${c ? '변경 저장' : '후보 추가'}</button>
+        </footer>
+      </form>`,
+    async (f, images) => {
+      if (!f.title?.trim()) throw new Error('상품명을 입력해 주세요.');
+      const payload = {
+        title: f.title.trim(), category: f.category.trim() || null, status: f.status, priority: f.priority,
+        target_price: numOrNull(f.target_price), reason: f.reason || null, target_customer: f.target_customer || null,
+        risks: f.risks || null, memo: f.memo || null, images
+      };
+      if (c) {
+        const { error } = await sb.from('candidates').update(payload).eq('id', c.id);
+        if (error) throw error;
+        await loadAll();
+        toast('변경 내용을 저장했습니다.');
+        await route();
+      } else {
+        const { data, error } = await sb.from('candidates').insert(payload).select().single();
+        if (error) throw error;
+        await loadAll();
+        toast('후보를 추가했습니다.');
+        location.hash = '#/c/' + data.id;
+      }
+    }, c?.images);
+  }
+
+  /* ---------- 소싱처 폼 ---------- */
+  function openSourceForm(candidateId, s) {
+    const v = (k) => esc(s?.[k] ?? '');
+    openModal(`
+      <form novalidate>
+        <header class="modal-head">
+          <h2>${s ? '소싱처 수정' : '소싱처 추가'}</h2>
+          <button type="button" class="icon-btn" data-close aria-label="닫기">✕</button>
+        </header>
+        <div class="modal-body">
+          <label>상품 링크 <small>붙여넣으면 사이트를 자동으로 채웁니다</small>
+            <input name="url" value="${v('url')}" placeholder="https://detail.1688.com/offer/..." autocomplete="off"></label>
+          <div class="row2">
+            <label>판매처 상품명 <input name="product_name" value="${v('product_name')}"></label>
+            <label>사이트 <input name="site" list="site-list" value="${v('site')}" required placeholder="예: 1688">
+              <datalist id="site-list">${SITES.map((x) => `<option value="${x}">`).join('')}</datalist></label>
+          </div>
+          <div class="row4">
+            <label>단가 <small>원화 환산</small><input name="unit_price" inputmode="numeric" value="${s?.unit_price ?? ''}" placeholder="8500"></label>
+            <label>배송비 <small>개당</small><input name="shipping_fee" inputmode="numeric" value="${s?.shipping_fee ?? ''}" placeholder="1200"></label>
+            <label>MOQ <small>최소 수량</small><input name="moq" inputmode="numeric" value="${s?.moq ?? ''}"></label>
+            <label>배송 기간 <small>일</small><input name="lead_days" inputmode="numeric" value="${s?.lead_days ?? ''}"></label>
+          </div>
+          <label>평점 · 후기 <input name="rating" value="${v('rating')}" placeholder="예: 4.8점, 후기 1,200개"></label>
+          <div class="row2" style="grid-template-columns:1fr 1fr">
+            <label>장점 <textarea name="pros" rows="3">${v('pros')}</textarea></label>
+            <label>단점 <textarea name="cons" rows="3">${v('cons')}</textarea></label>
+          </div>
+          <label>메모 <textarea name="memo" rows="2" placeholder="옵션, 색상, 샘플 주문 여부 등">${v('memo')}</textarea></label>
+          <div class="field">이미지 <div class="uploader"></div></div>
+          <label class="check"><input type="checkbox" name="is_selected" ${s?.is_selected ? 'checked' : ''}> 이 소싱처를 최종 선택으로 지정</label>
+        </div>
+        <footer class="modal-foot">
+          ${s ? '<button type="button" class="btn ghost danger" data-act="delete-source">삭제</button>' : ''}
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close>취소</button>
+          <button type="submit" class="btn primary">${s ? '변경 저장' : '소싱처 추가'}</button>
+        </footer>
+      </form>`,
+    async (f, images) => {
+      const url = normUrl(f.url);
+      const site = (f.site || '').trim() || guessSite(url || '') || '기타';
+      const payload = {
+        candidate_id: candidateId, site, url, product_name: f.product_name || null,
+        unit_price: numOrNull(f.unit_price), shipping_fee: numOrNull(f.shipping_fee),
+        moq: numOrNull(f.moq), lead_days: numOrNull(f.lead_days), rating: f.rating || null,
+        pros: f.pros || null, cons: f.cons || null, memo: f.memo || null,
+        is_selected: f.is_selected === 'on', images
+      };
+      let savedId = s?.id;
+      if (s) {
+        const { error } = await sb.from('sources').update(payload).eq('id', s.id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await sb.from('sources').insert(payload).select().single();
+        if (error) throw error;
+        savedId = data.id;
+      }
+      if (payload.is_selected) {
+        await sb.from('sources').update({ is_selected: false }).eq('candidate_id', candidateId).neq('id', savedId);
+      }
+      await loadAll();
+      toast(s ? '소싱처를 저장했습니다.' : '소싱처를 추가했습니다.');
+      await renderDetail(candidateId);
+    }, s?.images);
+
+    const urlInput = modal.querySelector('input[name=url]');
+    const siteInput = modal.querySelector('input[name=site]');
+    urlInput.addEventListener('input', () => {
+      const g = guessSite(normUrl(urlInput.value) || '');
+      if (g && (!siteInput.value || siteInput.dataset.auto === '1')) { siteInput.value = g; siteInput.dataset.auto = '1'; }
+    });
+    siteInput.addEventListener('input', () => { siteInput.dataset.auto = '0'; });
+
+    const del = modal.querySelector('[data-act=delete-source]');
+    if (del) del.addEventListener('click', async () => {
+      if (!confirm(`'${s.site}' 소싱처를 삭제할까요? 첨부 이미지도 함께 지워집니다.`)) return;
+      const { error } = await sb.from('sources').delete().eq('id', s.id);
+      if (error) { toast('삭제하지 못했습니다: ' + error.message, true); return; }
+      await removeFiles(s.images);
+      closeModal();
+      await loadAll();
+      toast('소싱처를 삭제했습니다.');
+      await renderDetail(candidateId);
+    });
+  }
+
+  /* =========================================================
+     라이트박스
+     ========================================================= */
+  const lb = { paths: [], i: 0 };
+  function renderLightbox() {
+    const p = lb.paths[lb.i];
+    const many = lb.paths.length > 1;
+    lightbox.innerHTML = `
+      <div class="lb">
+        <img src="${esc(imgUrl(p))}" alt="">
+        <div class="lb-bar">
+          <span>${lb.i + 1} / ${lb.paths.length}</span>
+          <span class="spacer"></span>
+          <button class="btn small" data-act="copy-image" data-path="${esc(p)}">이미지 복사</button>
+          <a class="btn small" href="${esc(imgUrl(p))}" target="_blank" rel="noopener">새 탭에서 열기</a>
+          <button class="btn small" data-act="lb-close">닫기</button>
+        </div>
+        ${many ? `<button class="lb-nav prev" data-act="lb-prev" aria-label="이전">‹</button><button class="lb-nav next" data-act="lb-next" aria-label="다음">›</button>` : ''}
+      </div>`;
+  }
+  function lbMove(d) { lb.i = (lb.i + d + lb.paths.length) % lb.paths.length; renderLightbox(); }
+  lightbox.addEventListener('click', (e) => { if (e.target === lightbox || e.target.classList.contains('lb')) lightbox.close(); });
+  lightbox.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') lbMove(-1);
+    if (e.key === 'ArrowRight') lbMove(1);
+  });
+
+  /* =========================================================
+     클릭 이벤트 (위임)
+     ========================================================= */
+  document.addEventListener('click', async (e) => {
+    const el = e.target.closest('[data-act]');
+    if (!el) return;
+    const act = el.dataset.act;
+    const id = currentDetailId();
+    const c = id ? state.candidates.find((x) => x.id === id) : null;
+
+    switch (act) {
+      case 'logout':
+        await sb.auth.signOut();
+        break;
+      case 'filter-status':
+        state.status = el.dataset.v;
+        document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.v === state.status));
+        renderGrid();
+        break;
+      case 'new-candidate':
+        openCandidateForm(null);
+        break;
+      case 'edit-candidate':
+        if (c) openCandidateForm(c);
+        break;
+      case 'delete-candidate': {
+        if (!c) break;
+        const srcs = sourcesOf(c.id);
+        if (!confirm(`'${c.title}' 후보를 삭제할까요?\n소싱처 ${srcs.length}곳과 모든 이미지가 함께 지워집니다.`)) break;
+        const { error } = await sb.from('candidates').delete().eq('id', c.id);
+        if (error) { toast('삭제하지 못했습니다: ' + error.message, true); break; }
+        await removeFiles([...(c.images || []), ...srcs.flatMap((s) => s.images || [])]);
+        await loadAll();
+        toast('후보를 삭제했습니다.');
+        location.hash = '#/';
+        break;
+      }
+      case 'new-source':
+        if (c) openSourceForm(c.id, null);
+        break;
+      case 'edit-source': {
+        const s = state.sources.find((x) => x.id === el.dataset.id);
+        if (s) openSourceForm(s.candidate_id, s);
+        break;
+      }
+      case 'toggle-select': {
+        const s = state.sources.find((x) => x.id === el.dataset.id);
+        if (!s) break;
+        const next = !s.is_selected;
+        if (next) await sb.from('sources').update({ is_selected: false }).eq('candidate_id', s.candidate_id).neq('id', s.id);
+        const { error } = await sb.from('sources').update({ is_selected: next }).eq('id', s.id);
+        if (error) { toast('바꾸지 못했습니다: ' + error.message, true); break; }
+        await loadAll();
+        toast(next ? `'${s.site}'을(를) 최종 선택했습니다.` : '최종 선택을 해제했습니다.');
+        await renderDetail(s.candidate_id);
+        break;
+      }
+      case 'copy-image':
+        e.preventDefault();
+        e.stopPropagation();
+        copyImage(el.dataset.path);
+        break;
+      case 'open-lightbox':
+        lb.paths = JSON.parse(el.dataset.set);
+        lb.i = +el.dataset.i;
+        renderLightbox();
+        lightbox.showModal();
+        break;
+      case 'lb-prev': lbMove(-1); break;
+      case 'lb-next': lbMove(1); break;
+      case 'lb-close': lightbox.close(); break;
+    }
+  });
+
+  document.addEventListener('change', async (e) => {
+    if (e.target.dataset.act !== 'quick-status') return;
+    const id = currentDetailId();
+    const status = e.target.value;
+    const { error } = await sb.from('candidates').update({ status }).eq('id', id);
+    if (error) { toast('상태를 바꾸지 못했습니다: ' + error.message, true); return; }
+    await loadAll();
+    toast(`상태를 '${status}'(으)로 바꿨습니다.`);
+    await renderDetail(id);
+  });
+
+  /* =========================================================
+     시작
+     ========================================================= */
+  (async () => {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) startApp(); else showLogin();
+    } catch (err) {
+      window.__bootFail('Supabase에 연결하지 못했습니다: ' + err.message + ' (config의 URL과 키를 확인하세요)');
+    }
+  })();
+})();
+
+</script>
+</body>
+</html>
