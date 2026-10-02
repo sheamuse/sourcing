@@ -7,7 +7,7 @@
   <title>신상품 소싱 보드</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-  <style>
+<style>
 :root {
   --bg: #F2F3F1;
   --surface: #FFFFFF;
@@ -346,6 +346,214 @@ tr.selected .cost-bar i { background: var(--accent); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
+/* =========================================================
+   v2: 사이드바 트리 · 계산기 · 문서 · 사용자
+   ========================================================= */
+:root { --topbar-h: 56px; --side-w: 272px; --calc-w: 384px; }
+.topbar { height: var(--topbar-h); padding-top: 0; padding-bottom: 0; }
+.topbar-left { display: flex; align-items: center; gap: 6px; }
+.side-toggle { display: none; }
+.view { max-width: 1180px; min-width: 0; width: 100%; }
+
+.shell { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: calc(100vh - var(--topbar-h)); transition: margin-right .2s; }
+body.calc-open .shell { margin-right: var(--calc-w); }
+@media (max-width: 1180px) { body.calc-open .shell { margin-right: 0; } }
+
+/* sidebar */
+.sidebar {
+  position: sticky; top: var(--topbar-h); height: calc(100vh - var(--topbar-h)); overflow-y: auto;
+  border-right: 1px solid var(--line); padding: 14px 10px 40px; background: var(--bg);
+}
+.side-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 8px 12px; }
+.side-head h2 { margin: 0; font-size: 14px; font-weight: 600; color: var(--muted); }
+.side-add { width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; color: var(--ink); }
+.side-add:hover { background: var(--surface-2); }
+.tree-all { margin-bottom: 4px; }
+.tree-row {
+  position: relative; display: flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 4px 0 calc(10px + var(--depth, 0) * 18px);
+  border-radius: 999px; font-size: 14px; color: var(--ink); user-select: none;
+}
+.tree-row:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.tree-row.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.tree-row .twisty { width: 20px; height: 20px; flex: none; border: 0; background: transparent; cursor: pointer; color: var(--muted); font-size: 11px; display: grid; place-items: center; border-radius: 4px; transition: transform .15s; }
+.tree-row .twisty.open { transform: rotate(90deg); }
+.tree-row .twisty.blank { visibility: hidden; }
+.tree-row .ico { width: 20px; flex: none; text-align: center; font-size: 15px; }
+.tree-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; color: inherit; padding: 8px 0; }
+.tree-row .count { font-size: 12px; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.tree-row .kebab { width: 28px; height: 28px; flex: none; border: 0; background: transparent; border-radius: 50%; cursor: pointer; color: var(--muted); font-size: 16px; opacity: 0; }
+.tree-row:hover .kebab, .tree-row.active .kebab, .tree-row .kebab:focus-visible { opacity: 1; }
+.tree-row .kebab:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+@media (hover: none) { .tree-row .kebab { opacity: 1; } }
+.tree-row.dragging { opacity: .4; }
+.tree-row.drop-before::before, .tree-row.drop-after::after {
+  content: ""; position: absolute; left: calc(10px + var(--depth, 0) * 18px); right: 8px; height: 2px; background: var(--accent); border-radius: 2px;
+}
+.tree-row.drop-before::before { top: -1px; }
+.tree-row.drop-after::after { bottom: -1px; }
+.tree-row.drop-inside { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.tree-root-drop { visibility: hidden; margin-top: 8px; padding: 10px 12px; border: 1.5px dashed transparent; border-radius: 10px; font-size: 12.5px; color: var(--muted); text-align: center; }
+body.tree-dragging .tree-root-drop { visibility: visible; border-color: var(--line-strong); }
+.tree-root-drop.drop-inside { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.tree-empty { padding: 8px 12px; font-size: 13px; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .side-toggle { display: inline-flex; }
+  .sidebar { position: fixed; z-index: 30; left: 0; top: var(--topbar-h); width: min(300px, 86vw); background: var(--surface); transform: translateX(-100%); transition: transform .2s; box-shadow: none; }
+  body.side-open .sidebar { transform: none; box-shadow: 0 10px 40px rgba(0,0,0,.18); }
+}
+
+/* popover menu */
+.menu {
+  position: absolute; z-index: 60; min-width: 180px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(10, 14, 12, .16);
+}
+.menu button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: transparent; padding: 8px 10px; border-radius: 6px; font-size: 14px; text-align: left; cursor: pointer; }
+.menu button:hover, .menu button:focus-visible { background: var(--surface-2); outline: none; }
+.menu button.danger { color: var(--danger); }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 2px; }
+.menu .mi { width: 18px; text-align: center; }
+
+/* small dialog */
+.mini { width: min(420px, calc(100vw - 24px)); padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); }
+.mini::backdrop { background: rgba(10, 14, 12, .45); }
+.mini form { padding: 20px 22px; display: grid; gap: 14px; }
+.mini h2 { margin: 0; font-size: 17px; letter-spacing: -0.02em; }
+.mini p { margin: 0; color: var(--muted); font-size: 14px; }
+.mini .actions { display: flex; justify-content: flex-end; gap: 8px; }
+.emoji-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; }
+.emoji-grid button { aspect-ratio: 1; border: 1px solid transparent; border-radius: 8px; background: transparent; font-size: 20px; cursor: pointer; }
+.emoji-grid button:hover { background: var(--surface-2); }
+.emoji-grid button.on { border-color: var(--accent); background: var(--accent-soft); }
+
+/* people */
+.avatar { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff; background: var(--c, #66706C); flex: none; }
+.who { display: inline-flex; align-items: center; gap: 6px; }
+.me-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px 0 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.me-btn:hover { border-color: var(--line-strong); }
+.people { display: grid; gap: 8px; }
+.person { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; font-weight: 600; font-size: 15px; text-align: left; width: 100%; }
+.person:hover { border-color: var(--accent); }
+.person.on { border-color: var(--accent); background: var(--accent-soft); }
+.person .rm { margin-left: auto; border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 6px; }
+.person .rm:hover { background: var(--surface-2); color: var(--danger); }
+.add-person { display: flex; gap: 8px; }
+
+/* calculator toggle + panel */
+.calc-btn[aria-pressed=true] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.calc {
+  position: fixed; z-index: 25; top: var(--topbar-h); right: 0; bottom: 0; width: min(var(--calc-w), 100vw);
+  background: var(--surface); border-left: 1px solid var(--line); overflow-y: auto;
+  transform: translateX(100%); transition: transform .2s; visibility: hidden;
+}
+body.calc-open .calc { transform: none; visibility: visible; }
+@media (max-width: 1180px) { body.calc-open .calc { box-shadow: -10px 0 40px rgba(0,0,0,.14); } }
+.calc-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.calc-head h2 { margin: 0; font-size: 16px; }
+.calc-sec { padding: 16px 18px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+.calc-sec h3 { margin: 0; font-size: 13px; color: var(--muted); font-weight: 700; }
+.rate-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.rate-val { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.rate-val small { font-size: 14px; font-weight: 500; color: var(--muted); }
+.rate-meta { font-size: 12px; color: var(--muted); }
+.rate-err { font-size: 12.5px; color: var(--danger); }
+.manual-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.manual-row input[type=number] { width: 120px; }
+.calc-input { font-size: 20px !important; font-weight: 600; padding: 10px 12px !important; font-variant-numeric: tabular-nums; }
+.calc-out { border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); padding: 14px; display: grid; gap: 6px; }
+.calc-expr { font-size: 13.5px; color: var(--muted); font-variant-numeric: tabular-nums; word-break: break-all; }
+.calc-final { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.calc-final strong { font-size: 28px; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.calc-sub { font-size: 12.5px; color: var(--muted); }
+.formula { font-family: var(--font); font-size: 15px !important; font-weight: 600; }
+.formula-err { font-size: 12.5px; color: var(--danger); min-height: 1em; margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; cursor: pointer; }
+.chips button:hover { border-color: var(--accent); color: var(--accent); }
+.calc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.calc-row label { display: grid; gap: 4px; font-size: 12.5px; font-weight: 600; }
+.calc-actions { display: flex; gap: 8px; align-items: center; }
+.calc-meta { font-size: 12px; color: var(--muted); margin: 0; }
+.draft-note { font-size: 12px; color: var(--review); background: var(--review-bg); border-radius: 6px; padding: 4px 8px; }
+
+/* price box in forms */
+.cny-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--surface-2); display: grid; gap: 8px; }
+.cny-top { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+.cny-final { display: grid; gap: 2px; font-size: 13px; font-weight: 600; }
+.cny-final strong { font-size: 22px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.cny-explain { margin: 0; font-size: 12.5px; color: var(--muted); font-weight: 400; word-break: break-all; }
+.cny-explain .recalc { margin-left: 6px; }
+.calc-note { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); font-weight: 400; word-break: break-all; }
+
+/* detail tabs */
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); margin-bottom: 10px; }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover { color: var(--ink); text-decoration: underline; }
+.title-emoji { margin-right: 8px; }
+.byline { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.dtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+.dtabs button { border: 0; background: transparent; padding: 10px 14px; font-size: 15px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.dtabs button:hover { color: var(--ink); }
+.dtabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--ink); }
+.dtabs .n { font-size: 12.5px; font-weight: 500; margin-left: 3px; color: var(--muted); }
+
+/* document editor */
+.doc-toolbar {
+  position: sticky; top: calc(var(--topbar-h) + 8px); z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+  padding: 6px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 14px;
+}
+.doc-toolbar button { min-width: 32px; height: 32px; padding: 0 7px; border: 0; background: transparent; border-radius: 7px; cursor: pointer; font-size: 14px; }
+.doc-toolbar button:hover { background: var(--surface-2); }
+.doc-toolbar select { width: auto; height: 32px; padding: 0 26px 0 8px; border-color: transparent; background-color: transparent; font-size: 13.5px; font-weight: 600; }
+.doc-toolbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+.doc-status { font-size: 12.5px; color: var(--muted); padding: 0 6px; white-space: nowrap; }
+.doc-status.err { color: var(--danger); }
+.doc-page { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.doc-editor {
+  max-width: 780px; margin: 0 auto; min-height: 62vh; padding: 44px clamp(18px, 5vw, 56px) 80px;
+  font-size: 16px; line-height: 1.8; outline: none; word-break: keep-all; overflow-wrap: anywhere;
+}
+.doc-editor:empty::before { content: attr(data-placeholder); color: var(--muted); }
+.doc-editor > :first-child { margin-top: 0; }
+.doc-editor h1 { font-size: 26px; line-height: 1.35; letter-spacing: -0.025em; margin: 1.3em 0 .5em; }
+.doc-editor h2 { font-size: 21px; line-height: 1.4; letter-spacing: -0.02em; margin: 1.2em 0 .4em; }
+.doc-editor h3 { font-size: 17.5px; margin: 1.1em 0 .3em; }
+.doc-editor p { margin: 0 0 .6em; }
+.doc-editor ul, .doc-editor ol { padding-left: 1.4em; margin: 0 0 .8em; }
+.doc-editor ul.checklist { list-style: none; padding-left: 0; }
+.doc-editor ul.checklist li { position: relative; padding-left: 30px; }
+.doc-editor ul.checklist li::before {
+  content: ""; position: absolute; left: 2px; top: .38em; width: 16px; height: 16px;
+  border: 1.5px solid var(--line-strong); border-radius: 4px; background: var(--surface); cursor: pointer;
+}
+.doc-editor ul.checklist li.checked { color: var(--muted); text-decoration: line-through; }
+.doc-editor ul.checklist li.checked::before { background: var(--accent); border-color: var(--accent); }
+.doc-editor ul.checklist li.checked::after { content: "✓"; position: absolute; left: 5px; top: .1em; color: #fff; font-size: 13px; font-weight: 700; text-decoration: none; }
+.doc-editor blockquote { margin: 0 0 .8em; padding: 4px 0 4px 16px; border-left: 3px solid var(--line-strong); color: var(--muted); }
+.doc-editor hr { border: 0; border-top: 1px solid var(--line-strong); margin: 1.6em 0; }
+.doc-editor a { color: var(--accent); }
+.doc-editor mark { background: #FFF0A0; color: inherit; padding: 0 2px; border-radius: 2px; }
+@media (prefers-color-scheme: dark) { .doc-editor mark { background: #5C5016; } }
+.doc-editor img { max-width: 100%; height: auto; border-radius: 6px; margin: 6px 0; display: inline-block; background: #fff; }
+.doc-editor img.uploading { opacity: .4; }
+.doc-editor table { border-collapse: collapse; width: 100%; margin: 0 0 1em; font-size: 15px; }
+.doc-editor td, .doc-editor th { border: 1px solid var(--line-strong); padding: 6px 10px; vertical-align: top; min-width: 60px; }
+.doc-editor th { background: var(--surface-2); text-align: left; }
+.conflict { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; margin-bottom: 12px; border-radius: 10px; background: var(--review-bg); color: var(--review); font-size: 14px; font-weight: 600; }
+.conflict .spacer { flex: 1; }
+
+/* folder view header */
+.folder-emoji { margin-right: 8px; }
+.list-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.card-foot .who { color: var(--muted); }
+
+.filters { flex-wrap: wrap; }
+.filters input { min-width: 180px; flex: 1; }
+
 </style>
 </head>
 <body>
@@ -360,13 +568,18 @@ tr.selected .cost-bar i { background: var(--accent); }
       var b = document.getElementById('boot'), m = document.getElementById('boot-msg');
       if (!b || !m) { alert(msg); return; }
       b.hidden = false; m.textContent = msg; m.style.color = '#A1342B';
+      var a = document.getElementById('app'), l = document.getElementById('login');
+      if (a) a.hidden = true; if (l) l.hidden = true;
     };
-    window.addEventListener('error', function (e) { window.__bootFail('오류: ' + (e.message || '스크립트를 불러오지 못했습니다')); });
+    window.addEventListener('error', function (e) {
+      if (document.getElementById('app') && !document.getElementById('app').hidden) return;
+      window.__bootFail('오류: ' + (e.message || '스크립트를 불러오지 못했습니다'));
+    });
     setTimeout(function () {
       var b = document.getElementById('boot');
       if (b && !b.hidden && document.getElementById('boot-msg').textContent === '불러오는 중…')
-        window.__bootFail('화면을 시작하지 못했습니다. 인터넷 연결과 config 설정을 확인해 주세요.');
-    }, 8000);
+        window.__bootFail('화면을 시작하지 못했습니다. 인터넷 연결과 설정을 확인해 주세요.');
+    }, 10000);
   </script>
 
   <!-- 비밀번호 화면 -->
@@ -385,26 +598,38 @@ tr.selected .cost-bar i { background: var(--accent); }
   <!-- 앱 -->
   <div id="app" hidden>
     <header class="topbar">
-      <a class="brand" href="#/">
-        <span class="brand-mark" aria-hidden="true">📦</span>
-        <span>신상품 소싱 보드</span>
-      </a>
+      <div class="topbar-left">
+        <button class="btn ghost small side-toggle" data-act="side-toggle" aria-label="폴더 목록">☰</button>
+        <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true">📦</span><span>신상품 소싱 보드</span></a>
+      </div>
       <div class="topbar-right">
         <div id="usage" class="usage" title="Supabase 무료 저장공간 1GB 기준"></div>
+        <button class="btn small calc-btn" id="calc-toggle" data-act="calc-toggle" aria-pressed="false" title="환율 계산기 켜기/끄기">💱 계산기</button>
+        <button class="me-btn" id="me" data-act="me" title="사용자 바꾸기"></button>
         <button class="btn ghost small" data-act="logout">나가기</button>
       </div>
     </header>
-    <main id="view" class="view"></main>
+    <div class="shell">
+      <aside class="sidebar" aria-label="폴더와 항목">
+        <div class="side-head">
+          <h2>문서 탭</h2>
+          <button class="side-add" data-act="side-add" aria-label="새 폴더나 항목 만들기" title="새로 만들기">+</button>
+        </div>
+        <nav id="tree"></nav>
+      </aside>
+      <main id="view" class="view"></main>
+    </div>
+    <aside id="calc" class="calc" aria-label="환율 계산기"></aside>
   </div>
 
   <dialog id="modal" class="modal"></dialog>
+  <dialog id="mini" class="mini"></dialog>
   <dialog id="lightbox" class="lightbox"></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
 /* ===== 설정: 여기만 수정하세요 ===== */
-// Supabase 프로젝트 정보를 넣어주세요. (README 3~5단계 참고)
 // anon(publishable) 키는 공개되어도 괜찮은 키입니다. 데이터는 비밀번호로 로그인해야만 보입니다.
 // 비밀번호 자체는 코드에 들어가지 않고 Supabase에만 저장됩니다.
 window.APP_CONFIG = {
@@ -413,7 +638,7 @@ window.APP_CONFIG = {
   // Supabase > Authentication > Users 에서 만든 팀 공용 계정의 이메일
   TEAM_EMAIL: 'team@yourshop.com'
 };
-</script>
+  </script>
   <script>
 (() => {
   'use strict';
@@ -432,6 +657,10 @@ window.APP_CONFIG = {
     [/temu\.com/, '테무'], [/coupang\.com/, '쿠팡'], [/smartstore\.naver|shopping\.naver|brand\.naver/, '네이버 스마트스토어'],
     [/domeggook\.com/, '도매꾹'], [/domeme\.com/, '도매매'], [/ownerclan\.com/, '오너클랜'], [/amazon\./, '아마존']
   ];
+  const DEFAULT_CALC = { formula: '위안 * (환율 + 10) * 1.5 + 2500', round_unit: 1, round_mode: 'round', use_manual: false, manual_rate: null };
+  const MEMBER_COLORS = ['#2346C8', '#C2410C', '#0F766E', '#9333EA', '#B91C1C', '#4D7C0F', '#0369A1'];
+  const EMOJIS = ['📄', '📁', '📦', '✅', '⭐', '🔥', '💡', '📌', '🐶', '🐱', '🍷', '👜', '👕', '👗', '👟', '🧸', '🎁', '🍼',
+    '🤰', '🔑', '🕯️', '🧴', '💄', '🏠', '🛋️', '🍳', '☕', '📱', '🎧', '⌚', '🌸', '🎄', '❄️', '☀️', '💰', '❓'];
 
   // 이미지 압축 기준: 긴 변 1600px, 장당 300KB 이하 WebP
   const MAX_SIDE = 1600;
@@ -442,9 +671,12 @@ window.APP_CONFIG = {
      유틸
      ========================================================= */
   const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const nl2br = (s) => esc(s).replace(/\n/g, '<br>');
-  const won = (n) => (n === null || n === undefined || n === '' || Number.isNaN(n)) ? '-' : Number(n).toLocaleString('ko-KR') + '원';
+  const fmtNum = (n, d = 2) => Number(n).toLocaleString('ko-KR', { maximumFractionDigits: d });
+  const won = (n) => (n === null || n === undefined || n === '' || Number.isNaN(+n)) ? '-' : Math.round(n).toLocaleString('ko-KR') + '원';
+  const yuan = (n) => (n === null || n === undefined || n === '') ? '-' : '¥' + fmtNum(n, 2);
   const size = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(b / 1024)) + 'KB';
   const totalCost = (s) => (s.unit_price == null && s.shipping_fee == null) ? null : (s.unit_price || 0) + (s.shipping_fee || 0);
   const marginPct = (target, cost) => (target && cost != null) ? Math.round(((target - cost) / target) * 1000) / 10 : null;
@@ -452,7 +684,27 @@ window.APP_CONFIG = {
   const guessSite = (url) => { const h = hostOf(url); const hit = SITE_HOSTS.find(([re]) => re.test(h)); return hit ? hit[1] : ''; };
   const normUrl = (u) => { u = (u || '').trim(); if (!u) return null; return /^https?:\/\//i.test(u) ? u : 'https://' + u; };
   const numOrNull = (v) => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/,/g, '')); return Number.isFinite(n) ? Math.round(n) : null; };
+  const decOrNull = (v) => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/,/g, '')); return Number.isFinite(n) ? n : null; };
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  const uid = () => (crypto.randomUUID && crypto.randomUUID()) || (Date.now() + '-' + Math.random().toString(36).slice(2));
+  const ls = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } }
+  };
+  function ago(ts) {
+    if (!ts) return '';
+    const d = (Date.now() - new Date(ts).getTime()) / 1000;
+    if (d < 60) return '방금';
+    if (d < 3600) return Math.floor(d / 60) + '분 전';
+    if (d < 86400) return Math.floor(d / 3600) + '시간 전';
+    if (d < 86400 * 7) return Math.floor(d / 86400) + '일 전';
+    const t = new Date(ts);
+    return `${t.getFullYear() % 100}.${t.getMonth() + 1}.${t.getDate()}`;
+  }
+  function fmtTime(ts) {
+    const t = new Date(ts);
+    return `${t.getMonth() + 1}/${t.getDate()} ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+  }
 
   let toastTimer;
   function toast(msg, isErr = false) {
@@ -472,22 +724,195 @@ window.APP_CONFIG = {
     return;
   }
   if (!cfg.SUPABASE_URL || /YOUR_/.test(cfg.SUPABASE_URL) || /YOUR_/.test(cfg.SUPABASE_ANON_KEY || '')) {
-    document.body.innerHTML = `
-      <div class="login"><div class="login-card">
-        <h1>설정이 필요합니다</h1>
-        <p class="muted">index.html 위쪽의 <b>설정</b> 부분(window.APP_CONFIG)에 Supabase URL, anon 키, 팀 계정 이메일을 넣어주세요. 자세한 방법은 README.md 5단계에 있습니다.</p>
-      </div></div>`;
+    window.__bootFail('index.html 위쪽의 설정 부분(window.APP_CONFIG)에 Supabase URL, 키, 팀 계정 이메일을 넣어주세요.');
     return;
   }
   const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
     auth: { persistSession: true, autoRefreshToken: true }
   });
 
-  const state = { candidates: [], sources: [], status: 'all', q: '', category: '', sort: 'new' };
+  const state = {
+    candidates: [], sources: [], folders: [],
+    settings: { calc: { ...DEFAULT_CALC }, members: [] }, settingsMeta: {},
+    status: 'all', q: '', category: '', author: '', sort: 'new',
+    tab: ls.get('sb_tab', 'doc'),
+    expanded: new Set(ls.get('sb_expanded', []))
+  };
+  let me = ls.get('sb_me', null);
   let activeUploader = null;
+  let docCtx = null;
   const view = $('#view');
   const modal = $('#modal');
   const lightbox = $('#lightbox');
+  const mini = $('#mini');
+
+  const stampNew = () => ({ created_by: me, updated_by: me });
+  const stampUpd = () => ({ updated_by: me });
+
+  /* =========================================================
+     사람(작성자)
+     ========================================================= */
+  function colorOf(name) {
+    const i = state.settings.members.indexOf(name);
+    if (i >= 0) return MEMBER_COLORS[i % MEMBER_COLORS.length];
+    let h = 0; for (const ch of String(name || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return MEMBER_COLORS[h % MEMBER_COLORS.length];
+  }
+  const avatar = (name) => name ? `<span class="avatar" style="--c:${colorOf(name)}" title="${esc(name)}">${esc([...name][0])}</span>` : '';
+  const whoHTML = (name, extra = '') => name ? `<span class="who">${avatar(name)}<span>${esc(name)}${extra ? ' ' + extra : ''}</span></span>` : '';
+
+  /* =========================================================
+     계산식 엔진 (안전한 사칙연산 파서)
+     ========================================================= */
+  const VAR_ALIASES = { '위안화': 'cny', '위안': 'cny', 'cny': 'cny', 'CNY': 'cny', '환율': 'rate', 'rate': 'rate' };
+  const NUM_RE = /^(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|^\.\d+/;
+
+  function tokenize(src) {
+    const s = String(src || '').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
+    const out = [];
+    let i = 0;
+    while (i < s.length) {
+      const ch = s[i];
+      if (/\s/.test(ch)) { i++; continue; }
+      const rest = s.slice(i);
+      const num = NUM_RE.exec(rest);
+      if (num) { out.push({ t: 'num', v: parseFloat(num[0].replace(/,/g, '')) }); i += num[0].length; continue; }
+      if ('+-*/()'.includes(ch)) { out.push({ t: 'op', v: ch }); i++; continue; }
+      const id = /^[A-Za-z가-힣_]+/.exec(rest);
+      if (id) {
+        const key = VAR_ALIASES[id[0]];
+        if (!key) throw new Error(`'${id[0]}'은(는) 쓸 수 없습니다. '위안'과 '환율'만 쓸 수 있어요.`);
+        out.push({ t: 'var', v: key }); i += id[0].length; continue;
+      }
+      throw new Error(`'${ch}' 기호는 쓸 수 없습니다.`);
+    }
+    return out;
+  }
+
+  function compile(src) {
+    const toks = tokenize(src);
+    let p = 0;
+    const peek = () => toks[p];
+    const isOp = (...ops) => peek() && peek().t === 'op' && ops.includes(peek().v);
+    function expr() {
+      let n = term();
+      while (isOp('+', '-')) { const o = toks[p++].v, l = n, r = term(); n = o === '+' ? (v) => l(v) + r(v) : (v) => l(v) - r(v); }
+      return n;
+    }
+    function term() {
+      let n = factor();
+      while (isOp('*', '/')) { const o = toks[p++].v, l = n, r = factor(); n = o === '*' ? (v) => l(v) * r(v) : (v) => l(v) / r(v); }
+      return n;
+    }
+    function factor() {
+      const t = toks[p++];
+      if (!t) throw new Error('식이 중간에 끝났습니다.');
+      if (t.t === 'num') { const val = t.v; return () => val; }
+      if (t.t === 'var') { const k = t.v; return (v) => v[k]; }
+      if (t.t === 'op' && t.v === '-') { const f = factor(); return (v) => -f(v); }
+      if (t.t === 'op' && t.v === '+') return factor();
+      if (t.t === 'op' && t.v === '(') {
+        const e = expr();
+        const c = toks[p++];
+        if (!c || c.v !== ')') throw new Error('괄호가 닫히지 않았습니다.');
+        return e;
+      }
+      throw new Error(`'${t.v}' 위치를 확인해 주세요.`);
+    }
+    if (!toks.length) throw new Error('계산법이 비어 있습니다.');
+    const fn = expr();
+    if (p < toks.length) throw new Error(`'${toks[p].v}' 근처를 확인해 주세요.`);
+    if (!toks.some((t) => t.t === 'var' && t.v === 'cny')) throw new Error('계산법에 "위안"이 들어가야 합니다.');
+    return fn;
+  }
+
+  function explainFormula(src, cny, rate) {
+    return String(src)
+      .replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-')
+      .replace(/(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?/g, (m) => fmtNum(parseFloat(m.replace(/,/g, '')), 4))
+      .replace(/위안화|위안|CNY|cny/g, () => fmtNum(cny, 2))
+      .replace(/환율|rate/g, () => fmtNum(rate, 2))
+      .replace(/\s*\*\s*/g, ' × ').replace(/\s*\/\s*/g, ' ÷ ')
+      .replace(/\s*\+\s*/g, ' + ').replace(/(\S)\s*-\s*/g, '$1 − ')
+      .replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').replace(/\s+/g, ' ').trim();
+  }
+
+  const ROUND_MODES = { round: '반올림', ceil: '올림', floor: '내림' };
+  function roundBy(v, unit, mode) {
+    const u = Number(unit) || 1;
+    const f = mode === 'ceil' ? Math.ceil : mode === 'floor' ? Math.floor : Math.round;
+    return f(v / u) * u;
+  }
+  const roundLabel = (c) => `${Number(c.round_unit) > 1 ? fmtNum(c.round_unit, 0) + '원' : '원'} 단위 ${ROUND_MODES[c.round_mode] || '반올림'}`;
+
+  /** 위안 금액 → 최종금액. calc 설정과 환율을 받아 적용 과정을 글로 돌려준다 */
+  function calcPrice(cny, calc = state.settings.calc, rate = currentRate()) {
+    if (cny == null || cny === '' || !Number.isFinite(+cny)) return null;
+    if (!rate) throw new Error('환율을 아직 불러오지 못했습니다. 계산기에서 수동 환율을 넣어 주세요.');
+    const fn = compile(calc.formula);
+    const raw = fn({ cny: +cny, rate: +rate });
+    if (!Number.isFinite(raw)) throw new Error('계산 결과가 올바르지 않습니다. 계산법을 확인해 주세요.');
+    const final = roundBy(raw, calc.round_unit, calc.round_mode);
+    const expr = explainFormula(calc.formula, +cny, +rate);
+    const text = `${expr} = ${fmtNum(raw, 2)}원 → ${fmtNum(final, 0)}원 (${roundLabel(calc)}, 환율 ${fmtNum(rate, 2)})`;
+    return { raw, final, rate: +rate, formula: calc.formula, text, krw: Math.round(cny * rate) };
+  }
+
+  /* =========================================================
+     환율
+     ========================================================= */
+  const rate = { value: null, source: '', at: null, fetched: 0, loading: false, error: null };
+  function currentRate() {
+    const c = state.settings.calc;
+    if (c.use_manual && Number(c.manual_rate) > 0) return Number(c.manual_rate);
+    return rate.value;
+  }
+  function rateDesc() {
+    const c = state.settings.calc;
+    if (c.use_manual && Number(c.manual_rate) > 0) return '수동 환율 사용 중';
+    if (!rate.value) return '';
+    return `${rate.source} · ${fmtTime(rate.at || rate.fetched)} 기준 · ${ago(rate.fetched)} 확인`;
+  }
+
+  async function fetchRate(force = false) {
+    const cached = ls.get('sb_rate', null);
+    if (!force && cached && cached.value && Date.now() - cached.fetched < 30 * 60 * 1000) {
+      Object.assign(rate, cached, { error: null });
+      onRateChange();
+      return;
+    }
+    rate.loading = true;
+    onRateChange();
+    const getJSON = async (u) => { const r = await fetch(u, { cache: 'no-store' }); if (!r.ok) throw new Error(r.status); return r.json(); };
+    const providers = [
+      ['open.er-api.com', async () => { const j = await getJSON('https://open.er-api.com/v6/latest/CNY'); if (j.result !== 'success') throw 0; return { value: j.rates.KRW, at: j.time_last_update_unix * 1000 }; }],
+      ['currency-api', async () => { const j = await getJSON('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/cny.json'); return { value: j.cny.krw, at: new Date(j.date).getTime() }; }],
+      ['frankfurter.app', async () => { const j = await getJSON('https://api.frankfurter.app/latest?from=CNY&to=KRW'); return { value: j.rates.KRW, at: new Date(j.date).getTime() }; }]
+    ];
+    let ok = false;
+    for (const [name, fn] of providers) {
+      try {
+        const r = await fn();
+        if (r.value > 0) {
+          Object.assign(rate, { value: r.value, source: name, at: r.at, fetched: Date.now(), error: null });
+          ls.set('sb_rate', { value: rate.value, source: name, at: r.at, fetched: rate.fetched });
+          ok = true;
+          break;
+        }
+      } catch { /* 다음 제공처 시도 */ }
+    }
+    if (!ok) {
+      if (cached && cached.value) Object.assign(rate, cached);
+      rate.error = '환율을 새로 불러오지 못했습니다.' + (rate.value ? ' 마지막으로 받은 환율을 사용합니다.' : ' 수동 환율을 입력해 주세요.');
+    }
+    rate.loading = false;
+    onRateChange();
+  }
+  function onRateChange() {
+    updateCalcRate();
+    updateCalcResult();
+    document.dispatchEvent(new CustomEvent('calcchange'));
+  }
 
   /* =========================================================
      로그인 (팀 공용 계정 + 비밀번호)
@@ -523,25 +948,53 @@ window.APP_CONFIG = {
     $('#login').hidden = true;
     $('#app').hidden = false;
     view.innerHTML = '<div class="loading">불러오는 중…</div>';
-    await loadAll();
+    const ok = await loadAll();
+    if (!ok) return;
+    if (ls.get('sb_calc_open', false)) setCalcOpen(true);
+    renderCalcPanel();
+    renderMe();
+    renderTree();
     await route();
     refreshUsage();
+    fetchRate();
+    if (!me || !state.settings.members.includes(me)) openWhoPicker(true);
   }
 
   /* =========================================================
      데이터
      ========================================================= */
   async function loadAll() {
-    const [c, s] = await Promise.all([
+    const [c, s, f, st] = await Promise.all([
       sb.from('candidates').select('*').order('created_at', { ascending: false }),
-      sb.from('sources').select('*').order('created_at', { ascending: true })
+      sb.from('sources').select('*').order('created_at', { ascending: true }),
+      sb.from('folders').select('*'),
+      sb.from('settings').select('*')
     ]);
-    if (c.error || s.error) {
-      toast('데이터를 불러오지 못했습니다: ' + (c.error || s.error).message, true);
-      return;
+    const err = c.error || s.error || f.error || st.error;
+    if (err) {
+      const needMigrate = /folders|settings|column|does not exist|schema cache/i.test(err.message);
+      view.innerHTML = `<div class="empty"><h2>${needMigrate ? '데이터베이스 업데이트가 필요합니다' : '데이터를 불러오지 못했습니다'}</h2>
+        <p>${needMigrate ? 'Supabase → SQL Editor에서 새 supabase-schema.sql 내용을 붙여넣고 Run 해주세요. 기존 데이터는 그대로 유지됩니다.' : esc(err.message)}</p>
+        <button class="btn" onclick="location.reload()">다시 시도</button></div>`;
+      return false;
     }
     state.candidates = c.data || [];
     state.sources = s.data || [];
+    state.folders = f.data || [];
+    (st.data || []).forEach((r) => {
+      state.settings[r.key] = r.value;
+      state.settingsMeta[r.key] = { by: r.updated_by, at: r.updated_at };
+    });
+    state.settings.calc = { ...DEFAULT_CALC, ...(state.settings.calc || {}) };
+    if (!Array.isArray(state.settings.members)) state.settings.members = [];
+    return true;
+  }
+
+  async function saveSetting(key, value) {
+    const { error } = await sb.from('settings').upsert({ key, value, updated_by: me });
+    if (error) throw error;
+    state.settings[key] = value;
+    state.settingsMeta[key] = { by: me, at: new Date().toISOString() };
   }
 
   const sourcesOf = (id) => state.sources.filter((s) => s.candidate_id === id);
@@ -553,12 +1006,46 @@ window.APP_CONFIG = {
     const costs = srcs.map(totalCost).filter((v) => v != null);
     return costs.length ? { cost: Math.min(...costs), chosen: false } : null;
   };
+  const docPaths = (html) => [...String(html || '').matchAll(/data-path="([^"]+)"/g)].map((m) => m[1]);
+
+  /* ---------- 폴더 트리 헬퍼 ---------- */
+  const bySort = (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.created_at).localeCompare(String(b.created_at));
+  const folderById = (id) => state.folders.find((f) => f.id === id);
+  const childFolders = (pid) => state.folders.filter((f) => (f.parent_id || null) === (pid || null)).sort(bySort);
+  const childItems = (fid) => state.candidates.filter((c) => (folderById(c.folder_id) ? c.folder_id : null) === (fid || null)).sort(bySort);
+  function descendantFolderIds(id) {
+    const out = new Set([id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      state.folders.forEach((f) => { if (f.parent_id && out.has(f.parent_id) && !out.has(f.id)) { out.add(f.id); grew = true; } });
+    }
+    return out;
+  }
+  const itemsUnder = (fid) => { const ids = descendantFolderIds(fid); return state.candidates.filter((c) => ids.has(c.folder_id)); };
+  function folderPath(fid) {
+    const path = [];
+    let f = folderById(fid);
+    const seen = new Set();
+    while (f && !seen.has(f.id)) { seen.add(f.id); path.unshift(f); f = folderById(f.parent_id); }
+    return path;
+  }
+  function folderOptions(selected, excludeIds = new Set()) {
+    const out = [`<option value="">(최상위)</option>`];
+    const walk = (pid, depth) => childFolders(pid).forEach((f) => {
+      if (excludeIds.has(f.id)) return;
+      out.push(`<option value="${f.id}" ${f.id === selected ? 'selected' : ''}>${'　'.repeat(depth)}${esc(f.emoji || '📁')} ${esc(f.name)}</option>`);
+      walk(f.id, depth + 1);
+    });
+    walk(null, 0);
+    return out.join('');
+  }
 
   /* =========================================================
-     이미지: 서명 URL 캐시
+     이미지: 서명 URL 캐시 · 업로드 · 압축
      ========================================================= */
   const urlCache = new Map();
-  const URL_TTL = 60 * 60 * 6; // 6시간
+  const URL_TTL = 60 * 60 * 6;
 
   async function ensureUrls(paths) {
     const now = Date.now();
@@ -573,7 +1060,7 @@ window.APP_CONFIG = {
   const imgUrl = (p) => urlCache.get(p)?.url || '';
 
   async function removeFiles(paths) {
-    const list = (paths || []).filter(Boolean);
+    const list = [...new Set((paths || []).filter(Boolean))];
     if (!list.length) return;
     const { error } = await sb.storage.from(BUCKET).remove(list);
     if (error) console.warn('이미지 삭제 실패', error);
@@ -596,9 +1083,6 @@ window.APP_CONFIG = {
       <span>이미지 ${count}장 · ${size(total)} / 1GB</span>`;
   }
 
-  /* =========================================================
-     이미지 압축 (브라우저에서 WebP로 변환)
-     ========================================================= */
   async function loadBitmap(blob) {
     if ('createImageBitmap' in window) {
       try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); } catch { /* fall through */ }
@@ -611,10 +1095,7 @@ window.APP_CONFIG = {
       img.src = url;
     });
   }
-
-  function canvasToBlob(canvas, type, q) {
-    return new Promise((res) => canvas.toBlob(res, type, q));
-  }
+  const canvasToBlob = (canvas, type, q) => new Promise((res) => canvas.toBlob(res, type, q));
 
   async function compressImage(file) {
     const bmp = await loadBitmap(file);
@@ -631,7 +1112,7 @@ window.APP_CONFIG = {
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(bmp, 0, 0, w, h);
       blob = await canvasToBlob(c, 'image/webp', quality);
-      if (!blob || blob.type !== 'image/webp') blob = await canvasToBlob(c, 'image/jpeg', quality); // WebP 미지원 브라우저
+      if (!blob || blob.type !== 'image/webp') blob = await canvasToBlob(c, 'image/jpeg', quality);
       if (blob.size <= TARGET_BYTES) break;
       if (quality > 0.6) quality -= 0.08; else maxSide = Math.round(maxSide * 0.82);
     }
@@ -641,8 +1122,7 @@ window.APP_CONFIG = {
 
   async function uploadBlob(blob) {
     const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
-    const id = (crypto.randomUUID && crypto.randomUUID()) || (Date.now() + '-' + Math.random().toString(36).slice(2));
-    const path = `img/${id}.${ext}`;
+    const path = `img/${uid()}.${ext}`;
     const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: '31536000', upsert: false });
     if (error) throw error;
     return path;
@@ -658,11 +1138,8 @@ window.APP_CONFIG = {
     return out;
   }
 
-  /* =========================================================
-     이미지 복사 (클립보드)
-     ========================================================= */
-  async function copyImage(path) {
-    const url = imgUrl(path);
+  async function copyImage(path, directUrl) {
+    const url = directUrl || imgUrl(path);
     if (!url || !navigator.clipboard || !window.ClipboardItem) {
       toast('이 브라우저는 이미지 복사를 지원하지 않습니다. 이미지를 우클릭해 복사해 주세요.', true);
       return;
@@ -772,20 +1249,27 @@ window.APP_CONFIG = {
     };
   }
 
-  // 어디서든 Ctrl+V: 모달이 열려 있으면 업로더로, 상세 화면이면 바로 그 후보에 추가
+  // 전역 Ctrl+V: 모달 업로더 → 요약 탭 이미지 (문서 편집기는 자체 처리)
   document.addEventListener('paste', async (e) => {
+    if (e.target.closest && e.target.closest('.doc-editor')) return;
+    if (mini.open) return;
     const files = imageFilesFrom(e.clipboardData);
     const html = e.clipboardData?.getData('text/html') || '';
+    const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName);
     if (!files.length) {
-      const inContext = (modal.open && activeUploader) || (!modal.open && currentDetailId());
-      if (inContext && /<img/i.test(html) && !/^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName)) {
+      const inContext = (modal.open && activeUploader) || (!modal.open && currentDetailId() && state.tab === 'info');
+      if (inContext && /<img/i.test(html) && !typing) {
         toast('글과 함께 복사된 이미지는 가져올 수 없습니다. 이미지를 우클릭 → "이미지 복사" 후 붙여넣어 주세요.', true);
       }
       return;
     }
     if (modal.open && activeUploader) { e.preventDefault(); activeUploader.addFiles(files); return; }
     const id = currentDetailId();
-    if (id && !lightbox.open) { e.preventDefault(); await quickAddImages(id, files); }
+    if (id && !lightbox.open && !modal.open) {
+      e.preventDefault();
+      if (state.tab === 'doc' && docCtx) { insertDocImages(files, true); return; }
+      await quickAddImages(id, files);
+    }
   });
 
   async function quickAddImages(id, files) {
@@ -801,10 +1285,12 @@ window.APP_CONFIG = {
         paths.push(await uploadBlob(blob));
       }
       const images = [...(c.images || []), ...paths];
-      const { error } = await sb.from('candidates').update({ images }).eq('id', id);
+      const { error } = await sb.from('candidates').update({ images, ...stampUpd() }).eq('id', id);
       if (error) { await removeFiles(paths); throw error; }
       c.images = images;
+      c.updated_by = me;
       toast(`이미지 ${paths.length}장 추가됨 (${size(orig)} → ${size(after)})`);
+      if (state.tab !== 'info') state.tab = 'info';
       await renderDetail(id);
       refreshUsage();
     } catch (err) {
@@ -813,44 +1299,727 @@ window.APP_CONFIG = {
   }
 
   /* =========================================================
-     라우팅
+     작은 대화상자 (이름 입력, 아이콘, 폴더 선택, 사용자)
      ========================================================= */
-  function currentDetailId() {
-    const m = location.hash.match(/^#\/c\/([\w-]+)/);
-    return m ? m[1] : null;
+  function miniDialog(html, { forced = false, onOpen } = {}) {
+    return new Promise((resolve) => {
+      mini.innerHTML = html;
+      let result = null;
+      const form = mini.querySelector('form');
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        result = form._result ? form._result() : Object.fromEntries(new FormData(form));
+        if (result === false) { result = null; return; }
+        mini.close();
+      });
+      mini.querySelectorAll('[data-mini-close]').forEach((b) => b.addEventListener('click', () => mini.close()));
+      const onCancel = (e) => { if (forced) e.preventDefault(); };
+      mini.addEventListener('cancel', onCancel);
+      mini.addEventListener('close', function done() {
+        mini.removeEventListener('close', done);
+        mini.removeEventListener('cancel', onCancel);
+        resolve(result);
+      });
+      mini.showModal();
+      if (onOpen) onOpen(form, (r) => { result = r; mini.close(); });
+      const first = form.querySelector('input:not([type=hidden]), select');
+      if (first) { first.focus(); if (first.select) first.select(); }
+    });
   }
-  async function route() {
-    const id = currentDetailId();
-    if (id) await renderDetail(id); else renderList();
-    window.scrollTo(0, 0);
+
+  async function askText(title, label, value = '', placeholder = '') {
+    const r = await miniDialog(`
+      <form>
+        <h2>${esc(title)}</h2>
+        <label class="field">${esc(label)}<input name="v" value="${esc(value)}" placeholder="${esc(placeholder)}" required maxlength="120"></label>
+        <div class="actions"><button type="button" class="btn" data-mini-close>취소</button><button class="btn primary">확인</button></div>
+      </form>`);
+    const v = r?.v?.trim();
+    return v || null;
   }
-  window.addEventListener('hashchange', route);
+
+  async function askEmoji(current) {
+    const r = await miniDialog(`
+      <form>
+        <h2>아이콘 고르기</h2>
+        <div class="emoji-grid">${EMOJIS.map((e) => `<button type="button" data-e="${e}" class="${e === current ? 'on' : ''}">${e}</button>`).join('')}</div>
+        <label class="field">직접 입력 <small>(Windows: 윈도우키 + . 으로 이모지 창 열기)</small><input name="v" value="${esc(current || '')}" maxlength="8"></label>
+        <div class="actions">
+          <button type="button" class="btn ghost" data-clear>기본 아이콘</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-mini-close>취소</button><button class="btn primary">확인</button>
+        </div>
+      </form>`, {
+      onOpen(form, finish) {
+        form.querySelector('.emoji-grid').addEventListener('click', (e) => {
+          const b = e.target.closest('[data-e]'); if (b) finish({ v: b.dataset.e });
+        });
+        form.querySelector('[data-clear]').addEventListener('click', () => finish({ v: '' }));
+      }
+    });
+    if (!r) return undefined;
+    return (r.v || '').trim();
+  }
+
+  async function askFolder(title, current, excludeIds) {
+    const r = await miniDialog(`
+      <form>
+        <h2>${esc(title)}</h2>
+        <label class="field">옮길 폴더<select name="v">${folderOptions(current, excludeIds)}</select></label>
+        <div class="actions"><button type="button" class="btn" data-mini-close>취소</button><button class="btn primary">옮기기</button></div>
+      </form>`);
+    if (!r) return undefined;
+    return r.v || null;
+  }
+
+  async function confirmBox(title, message, okLabel = '삭제', danger = true) {
+    const r = await miniDialog(`
+      <form>
+        <h2>${esc(title)}</h2>
+        <p>${message}</p>
+        <div class="actions"><button type="button" class="btn" data-mini-close>취소</button><button class="btn ${danger ? 'primary' : 'primary'}" style="${danger ? 'background:var(--danger);border-color:var(--danger);color:#fff' : ''}">${esc(okLabel)}</button></div>
+      </form>`);
+    return !!r;
+  }
+
+  /* ---------- 누가 사용 중? ---------- */
+  function renderMe() {
+    $('#me').innerHTML = me ? `${avatar(me)}<span>${esc(me)}</span>` : '<span>사용자 선택</span>';
+  }
+
+  async function openWhoPicker(forced) {
+    const members = state.settings.members;
+    await miniDialog(`
+      <form>
+        <h2>누가 사용하나요?</h2>
+        <p>올리거나 수정한 사람이 함께 기록됩니다. 이 기기에서는 다음부터 자동으로 선택됩니다.</p>
+        <div class="people">
+          ${members.map((m) => `
+            <div class="person ${m === me ? 'on' : ''}" role="button" tabindex="0" data-pick="${esc(m)}">
+              ${avatar(m)}<span>${esc(m)}</span>
+              ${m !== me ? `<button type="button" class="rm" data-rm="${esc(m)}" title="목록에서 빼기">✕</button>` : ''}
+            </div>`).join('') || '<p>아직 등록된 사람이 없습니다. 아래에 이름을 추가하세요.</p>'}
+        </div>
+        <div class="add-person"><input name="newname" placeholder="새 이름 추가" maxlength="20"><button type="button" class="btn" data-add>추가</button></div>
+        ${forced ? '' : '<div class="actions"><button type="button" class="btn" data-mini-close>닫기</button></div>'}
+      </form>`, {
+      forced,
+      onOpen(form, finish) {
+        const pick = async (name) => {
+          me = name; ls.set('sb_me', me); renderMe();
+          toast(`${name}(으)로 사용합니다.`);
+          finish({});
+          route(false);
+        };
+        form.querySelector('.people').addEventListener('click', async (e) => {
+          const rm = e.target.closest('[data-rm]');
+          if (rm) {
+            e.stopPropagation();
+            if (!confirm(`'${rm.dataset.rm}'을(를) 목록에서 뺄까요? 이미 기록된 이름은 그대로 남습니다.`)) return;
+            try { await saveSetting('members', state.settings.members.filter((x) => x !== rm.dataset.rm)); } catch (err) { toast(err.message, true); return; }
+            finish({}); setTimeout(() => openWhoPicker(forced), 30);
+            return;
+          }
+          const p = e.target.closest('[data-pick]');
+          if (p) pick(p.dataset.pick);
+        });
+        form.querySelector('.people').addEventListener('keydown', (e) => {
+          const p = e.target.closest('[data-pick]'); if (p && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(p.dataset.pick); }
+        });
+        const add = async () => {
+          const name = form.newname.value.trim();
+          if (!name) { form.newname.focus(); return; }
+          if (!state.settings.members.includes(name)) {
+            try { await saveSetting('members', [...state.settings.members, name]); } catch (err) { toast('추가하지 못했습니다: ' + err.message, true); return; }
+          }
+          pick(name);
+        };
+        form.querySelector('[data-add]').addEventListener('click', add);
+        form.newname.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+        form._result = () => false;
+      }
+    });
+  }
 
   /* =========================================================
-     목록 화면
+     팝업 메뉴
      ========================================================= */
-  function renderList() {
-    const counts = Object.fromEntries(STATUSES.map((s) => [s, state.candidates.filter((c) => c.status === s).length]));
-    const cats = [...new Set(state.candidates.map((c) => c.category).filter(Boolean))].sort();
+  let openMenuEl = null;
+  function closeMenu() { if (openMenuEl) { openMenuEl.remove(); openMenuEl = null; } }
+  function openMenu(anchor, items) {
+    closeMenu();
+    const m = document.createElement('div');
+    m.className = 'menu';
+    m.setAttribute('role', 'menu');
+    m.innerHTML = items.map((it, i) => it === '-' ? '<hr>' :
+      `<button type="button" role="menuitem" data-i="${i}" class="${it.danger ? 'danger' : ''}"><span class="mi">${it.icon || ''}</span>${esc(it.label)}</button>`).join('');
+    document.body.append(m);
+    const r = anchor.getBoundingClientRect();
+    const mw = m.offsetWidth, mh = m.offsetHeight;
+    let top = r.bottom + 4 + window.scrollY;
+    if (r.bottom + mh + 8 > window.innerHeight) top = r.top - mh - 4 + window.scrollY;
+    m.style.top = Math.max(8, top) + 'px';
+    m.style.left = Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - mw - 8)) + 'px';
+    m.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-i]'); if (!b) return;
+      closeMenu();
+      items[+b.dataset.i].run();
+    });
+    openMenuEl = m;
+    m.querySelector('button')?.focus();
+  }
+  document.addEventListener('mousedown', (e) => { if (openMenuEl && !openMenuEl.contains(e.target) && !e.target.closest('.kebab, [data-act=side-add]')) closeMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+
+  /* =========================================================
+     사이드바 트리
+     ========================================================= */
+  function persistExpanded() { ls.set('sb_expanded', [...state.expanded]); }
+
+  function renderTree() {
+    const activeItem = currentDetailId();
+    const activeFolder = currentFolderId();
+    // 현재 항목의 상위 폴더는 펼쳐두기
+    if (activeItem) {
+      const c = state.candidates.find((x) => x.id === activeItem);
+      if (c && c.folder_id) folderPath(c.folder_id).forEach((f) => state.expanded.add(f.id));
+    }
+    if (activeFolder && renderTree.lastFolder !== activeFolder) folderPath(activeFolder).forEach((f) => state.expanded.add(f.id));
+    renderTree.lastFolder = activeFolder;
+    const rowItem = (c, depth) => `
+      <div class="tree-row item ${c.id === activeItem ? 'active' : ''}" style="--depth:${depth}" draggable="true" data-type="item" data-id="${c.id}">
+        <span class="twisty blank"></span>
+        <span class="ico">${esc(c.emoji || '📄')}</span>
+        <a class="name" href="#/c/${c.id}" title="${esc(c.title)}${c.created_by ? ' · ' + esc(c.created_by) : ''}">${esc(c.title)}</a>
+        <button class="kebab" data-act="tree-menu" aria-label="메뉴">⋮</button>
+      </div>`;
+    const walk = (pid, depth) => {
+      let html = '';
+      for (const f of childFolders(pid)) {
+        const open = state.expanded.has(f.id);
+        const hasKids = childFolders(f.id).length || childItems(f.id).length;
+        html += `
+          <div class="tree-row folder ${f.id === activeFolder ? 'active' : ''}" style="--depth:${depth}" draggable="true" data-type="folder" data-id="${f.id}">
+            <button class="twisty ${open ? 'open' : ''} ${hasKids ? '' : 'blank'}" data-act="toggle-folder" aria-label="${open ? '접기' : '펼치기'}">▶</button>
+            <span class="ico">${esc(f.emoji || '📁')}</span>
+            <a class="name" href="#/f/${f.id}">${esc(f.name)}</a>
+            <span class="count">${itemsUnder(f.id).length || ''}</span>
+            <button class="kebab" data-act="tree-menu" aria-label="메뉴">⋮</button>
+          </div>`;
+        if (open) html += walk(f.id, depth + 1);
+      }
+      for (const c of childItems(pid)) html += rowItem(c, depth);
+      return html;
+    };
+    const body = walk(null, 0);
+    $('#tree').innerHTML = `
+      <div class="tree-row tree-all ${!activeItem && !activeFolder ? 'active' : ''}" style="--depth:0">
+        <span class="twisty blank"></span><span class="ico">🗂️</span>
+        <a class="name" href="#/">전체 후보</a><span class="count">${state.candidates.length}</span>
+      </div>
+      ${body || '<div class="tree-empty">아직 폴더나 항목이 없습니다. + 를 눌러 만들어 보세요.</div>'}
+      <div class="tree-root-drop" data-root-drop>여기에 놓으면 최상위로 옮겨집니다</div>`;
+  }
+
+  // 트리 클릭
+  $('#tree').addEventListener('click', (e) => {
+    const row = e.target.closest('.tree-row');
+    if (!row) return;
+    if (e.target.closest('[data-act=toggle-folder]')) {
+      const id = row.dataset.id;
+      if (state.expanded.has(id)) state.expanded.delete(id); else state.expanded.add(id);
+      persistExpanded();
+      renderTree();
+      return;
+    }
+    if (e.target.closest('[data-act=tree-menu]')) {
+      e.preventDefault();
+      const btn = e.target.closest('.kebab');
+      if (row.dataset.type === 'folder') folderMenu(btn, folderById(row.dataset.id));
+      else itemMenu(btn, state.candidates.find((c) => c.id === row.dataset.id));
+      return;
+    }
+    if (e.target.closest('a')) document.body.classList.remove('side-open');
+  });
+
+  function folderMenu(anchor, f) {
+    if (!f) return;
+    openMenu(anchor, [
+      { icon: '📄', label: '이 폴더에 새 항목', run: () => openCandidateForm(null, { folderId: f.id }) },
+      { icon: '📁', label: '하위 폴더 만들기', run: () => newFolder(f.id) },
+      '-',
+      { icon: '✏️', label: '이름 바꾸기', run: async () => {
+        const name = await askText('폴더 이름 바꾸기', '폴더 이름', f.name); if (!name) return;
+        await updateRow('folders', f.id, { name, ...stampUpd() }, '이름을 바꿨습니다.');
+      } },
+      { icon: '😀', label: '아이콘 바꾸기', run: async () => {
+        const e = await askEmoji(f.emoji); if (e === undefined) return;
+        await updateRow('folders', f.id, { emoji: e || null, ...stampUpd() }, '아이콘을 바꿨습니다.');
+      } },
+      { icon: '↪️', label: '다른 폴더로 옮기기', run: async () => {
+        const to = await askFolder(`'${f.name}' 옮기기`, f.parent_id, descendantFolderIds(f.id)); if (to === undefined) return;
+        await updateRow('folders', f.id, { parent_id: to, sort_order: Date.now() / 1000, ...stampUpd() }, '폴더를 옮겼습니다.');
+        if (to) { state.expanded.add(to); persistExpanded(); renderTree(); }
+      } },
+      '-',
+      { icon: '🗑️', label: '폴더 삭제', danger: true, run: () => deleteFolder(f) }
+    ]);
+  }
+
+  function itemMenu(anchor, c) {
+    if (!c) return;
+    openMenu(anchor, [
+      { icon: '✏️', label: '이름 바꾸기', run: async () => {
+        const title = await askText('이름 바꾸기', '상품명', c.title); if (!title) return;
+        await updateRow('candidates', c.id, { title, ...stampUpd() }, '이름을 바꿨습니다.');
+      } },
+      { icon: '😀', label: '아이콘 바꾸기', run: async () => {
+        const e = await askEmoji(c.emoji); if (e === undefined) return;
+        await updateRow('candidates', c.id, { emoji: e || null, ...stampUpd() }, '아이콘을 바꿨습니다.');
+      } },
+      { icon: '↪️', label: '다른 폴더로 옮기기', run: async () => {
+        const to = await askFolder(`'${c.title}' 옮기기`, c.folder_id, new Set()); if (to === undefined) return;
+        await updateRow('candidates', c.id, { folder_id: to, sort_order: Date.now() / 1000, ...stampUpd() }, '항목을 옮겼습니다.');
+        if (to) { state.expanded.add(to); persistExpanded(); renderTree(); }
+      } },
+      { icon: '🔗', label: '링크 복사', run: () => {
+        navigator.clipboard?.writeText(location.href.split('#')[0] + '#/c/' + c.id).then(() => toast('링크를 복사했습니다.'));
+      } },
+      '-',
+      { icon: '🗑️', label: '삭제', danger: true, run: () => deleteCandidate(c) }
+    ]);
+  }
+
+  // 사이드바 + 버튼
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act=side-add]');
+    if (!b) return;
+    const fid = currentFolderId() || (() => { const c = state.candidates.find((x) => x.id === currentDetailId()); return c?.folder_id || null; })();
+    const inName = fid && folderById(fid) ? ` (${folderById(fid).name} 안에)` : '';
+    openMenu(b, [
+      { icon: '📄', label: '새 항목' + inName, run: () => openCandidateForm(null, { folderId: fid }) },
+      { icon: '📁', label: '새 폴더' + inName, run: () => newFolder(fid) }
+    ]);
+  });
+
+  async function updateRow(table, id, patch, msg) {
+    await flushDoc();
+    const { error } = await sb.from(table).update(patch).eq('id', id);
+    if (error) { toast('저장하지 못했습니다: ' + error.message, true); return false; }
+    await loadAll();
+    renderTree();
+    await route(false);
+    if (msg) toast(msg);
+    return true;
+  }
+
+  async function newFolder(parentId) {
+    const name = await askText('새 폴더', '폴더 이름', '', '예: 효리, 이번 시즌, 샘플선정');
+    if (!name) return;
+    const { error } = await sb.from('folders').insert({ name, parent_id: parentId || null, ...stampNew() });
+    if (error) { toast('폴더를 만들지 못했습니다: ' + error.message, true); return; }
+    if (parentId) state.expanded.add(parentId);
+    persistExpanded();
+    await loadAll();
+    renderTree();
+    toast(`'${name}' 폴더를 만들었습니다.`);
+  }
+
+  async function deleteFolder(f) {
+    const kids = childFolders(f.id).length, items = childItems(f.id).length;
+    const parent = f.parent_id ? folderById(f.parent_id) : null;
+    const where = parent ? `'${esc(parent.name)}' 폴더` : '최상위';
+    const ok = await confirmBox('폴더 삭제', `'${esc(f.name)}' 폴더를 삭제할까요?${kids || items ? `<br>안에 있는 폴더 ${kids}개와 항목 ${items}개는 지워지지 않고 ${where}로 옮겨집니다.` : ''}`);
+    if (!ok) return;
+    const r1 = await sb.from('candidates').update({ folder_id: f.parent_id || null }).eq('folder_id', f.id);
+    const r2 = await sb.from('folders').update({ parent_id: f.parent_id || null }).eq('parent_id', f.id);
+    const r3 = await sb.from('folders').delete().eq('id', f.id);
+    const err = r1.error || r2.error || r3.error;
+    if (err) { toast('삭제하지 못했습니다: ' + err.message, true); return; }
+    await loadAll();
+    renderTree();
+    toast('폴더를 삭제했습니다.');
+    if (currentFolderId() === f.id) location.hash = f.parent_id ? '#/f/' + f.parent_id : '#/';
+  }
+
+  async function deleteCandidate(c) {
+    const srcs = sourcesOf(c.id);
+    const ok = await confirmBox('항목 삭제', `'${esc(c.title)}'을(를) 삭제할까요?<br>문서, 소싱처 ${srcs.length}곳, 모든 이미지가 함께 지워집니다.`);
+    if (!ok) return;
+    const { error } = await sb.from('candidates').delete().eq('id', c.id);
+    if (error) { toast('삭제하지 못했습니다: ' + error.message, true); return; }
+    if (docCtx && docCtx.id === c.id) docCtx = null;
+    await removeFiles([...(c.images || []), ...srcs.flatMap((s) => s.images || []), ...docPaths(c.doc_html)]);
+    await loadAll();
+    renderTree();
+    toast('삭제했습니다.');
+    if (currentDetailId() === c.id) location.hash = c.folder_id && folderById(c.folder_id) ? '#/f/' + c.folder_id : '#/';
+    else route(false);
+  }
+
+  /* ---------- 끌어서 옮기기 ---------- */
+  let drag = null;
+  const tree = $('#tree');
+  function clearDropMarks() { $$('.drop-before, .drop-after, .drop-inside', tree).forEach((el) => el.classList.remove('drop-before', 'drop-after', 'drop-inside')); }
+
+  tree.addEventListener('dragstart', (e) => {
+    const row = e.target.closest('.tree-row[data-id]');
+    if (!row) return;
+    drag = { type: row.dataset.type, id: row.dataset.id };
+    row.classList.add('dragging');
+    document.body.classList.add('tree-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', drag.id); } catch { /* ignore */ }
+  });
+  tree.addEventListener('dragend', () => {
+    drag = null; clearDropMarks();
+    document.body.classList.remove('tree-dragging');
+    $$('.dragging', tree).forEach((el) => el.classList.remove('dragging'));
+  });
+
+  function dropPosition(e, row) {
+    if (row.hasAttribute('data-root-drop')) return 'root';
+    if (!row.dataset.id) return null;
+    const r = row.getBoundingClientRect();
+    const y = (e.clientY - r.top) / r.height;
+    if (row.dataset.type === 'folder') {
+      if (drag.type === 'item') return 'inside';
+      if (drag.id === row.dataset.id || descendantFolderIds(drag.id).has(row.dataset.id)) return null;
+      return y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'inside';
+    }
+    if (drag.type === 'folder') return null;
+    if (drag.id === row.dataset.id) return null;
+    return y < 0.5 ? 'before' : 'after';
+  }
+
+  tree.addEventListener('dragover', (e) => {
+    if (!drag) return;
+    const row = e.target.closest('.tree-row[data-id], [data-root-drop]');
+    clearDropMarks();
+    if (!row) return;
+    const pos = dropPosition(e, row);
+    if (!pos) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    row.classList.add(pos === 'root' || pos === 'inside' ? 'drop-inside' : 'drop-' + pos);
+  });
+
+  tree.addEventListener('drop', async (e) => {
+    if (!drag) return;
+    const row = e.target.closest('.tree-row[data-id], [data-root-drop]');
+    const pos = row && dropPosition(e, row);
+    const d = drag;
+    clearDropMarks();
+    document.body.classList.remove('tree-dragging');
+    if (!pos) return;
+    e.preventDefault();
+    const table = d.type === 'folder' ? 'folders' : 'candidates';
+    const parentKey = d.type === 'folder' ? 'parent_id' : 'folder_id';
+    let parent = null, sort = Date.now() / 1000;
+
+    if (pos === 'root') {
+      parent = null;
+    } else if (pos === 'inside') {
+      parent = row.dataset.id;
+      state.expanded.add(parent); persistExpanded();
+    } else {
+      const target = d.type === 'folder' ? folderById(row.dataset.id) : state.candidates.find((c) => c.id === row.dataset.id);
+      parent = d.type === 'folder' ? (target.parent_id || null) : (folderById(target.folder_id) ? target.folder_id : null);
+      const sibs = (d.type === 'folder' ? childFolders(parent) : childItems(parent)).filter((x) => x.id !== d.id);
+      const i = sibs.findIndex((x) => x.id === target.id);
+      const so = (x) => x.sort_order ?? 0;
+      if (pos === 'before') sort = i > 0 ? (so(sibs[i - 1]) + so(sibs[i])) / 2 : so(sibs[i]) - 1;
+      else sort = i < sibs.length - 1 ? (so(sibs[i]) + so(sibs[i + 1])) / 2 : so(sibs[i]) + 1;
+    }
+    // 화면에 먼저 반영
+    const obj = d.type === 'folder' ? folderById(d.id) : state.candidates.find((c) => c.id === d.id);
+    if (obj) { obj[parentKey] = parent; obj.sort_order = sort; renderTree(); }
+    const { error } = await sb.from(table).update({ [parentKey]: parent, sort_order: sort, ...stampUpd() }).eq('id', d.id);
+    if (error) { toast('옮기지 못했습니다: ' + error.message, true); await loadAll(); renderTree(); return; }
+    if (currentFolderId() || location.hash === '#/' || !location.hash) route(false);
+  });
+
+  /* =========================================================
+     환율 계산기 패널
+     ========================================================= */
+  let calcCny = ls.get('sb_calc_cny', '');
+  let calcDraft = null; // 저장 전 수정 중인 계산법
+
+  function setCalcOpen(open) {
+    document.body.classList.toggle('calc-open', open);
+    $('#calc-toggle').setAttribute('aria-pressed', String(open));
+    ls.set('sb_calc_open', open);
+    if (open) setTimeout(() => $('#calc-cny')?.focus(), 50);
+  }
+
+  function renderCalcPanel() {
+    const c = state.settings.calc;
+    calcDraft = { formula: c.formula, round_unit: c.round_unit, round_mode: c.round_mode };
+    const meta = state.settingsMeta.calc;
+    $('#calc').innerHTML = `
+      <div class="calc-head">
+        <h2>💱 환율 계산기</h2>
+        <button class="icon-btn" data-act="calc-close" aria-label="계산기 닫기">✕</button>
+      </div>
+      <section class="calc-sec">
+        <h3>위안 환율</h3>
+        <div class="rate-line">
+          <div class="rate-val" id="rate-val">-</div>
+          <button class="btn small" data-act="rate-refresh">새로고침</button>
+        </div>
+        <div class="rate-meta" id="rate-meta"></div>
+        <div class="rate-err" id="rate-err"></div>
+        <div class="manual-row">
+          <label class="check" style="font-size:13px"><input type="checkbox" id="use-manual" ${c.use_manual ? 'checked' : ''}> 수동 환율</label>
+          <input type="number" id="manual-rate" step="0.01" min="0" value="${c.manual_rate ?? ''}" placeholder="예: 192.5" ${c.use_manual ? '' : 'disabled'}>
+        </div>
+      </section>
+      <section class="calc-sec">
+        <h3>계산하기</h3>
+        <label class="field" style="font-size:13px;font-weight:600">위안화 금액 (¥)
+          <input id="calc-cny" class="calc-input" inputmode="decimal" placeholder="0" value="${esc(calcCny)}">
+        </label>
+        <div class="calc-out" id="calc-out"></div>
+      </section>
+      <section class="calc-sec">
+        <h3>계산법</h3>
+        <textarea id="calc-formula" class="formula" rows="2" spellcheck="false">${esc(c.formula)}</textarea>
+        <div class="chips">
+          <button type="button" data-ins="위안">위안</button><button type="button" data-ins="환율">환율</button>
+          <button type="button" data-ins=" + ">+</button><button type="button" data-ins=" - ">−</button>
+          <button type="button" data-ins=" * ">×</button><button type="button" data-ins=" / ">÷</button>
+          <button type="button" data-ins="(">(</button><button type="button" data-ins=")">)</button>
+        </div>
+        <div class="calc-row">
+          <label>끝자리 정리
+            <select id="calc-unit">
+              ${[1, 10, 100, 1000].map((u) => `<option value="${u}" ${+c.round_unit === u ? 'selected' : ''}>${u === 1 ? '원 단위' : fmtNum(u, 0) + '원 단위'}</option>`).join('')}
+            </select></label>
+          <label>방식
+            <select id="calc-mode">
+              ${Object.entries(ROUND_MODES).map(([k, v]) => `<option value="${k}" ${c.round_mode === k ? 'selected' : ''}>${v}</option>`).join('')}
+            </select></label>
+        </div>
+        <p class="formula-err" id="formula-err"></p>
+        <div class="calc-actions">
+          <button class="btn primary" data-act="calc-save">계산법 저장</button>
+          <button class="btn ghost" data-act="calc-reset" title="${esc(DEFAULT_CALC.formula)}">기본값</button>
+        </div>
+        <p class="calc-meta">저장하면 팀 모두의 계산기와 상품 등록에 바로 적용됩니다.${meta?.by ? `<br>마지막 저장: ${esc(meta.by)} · ${fmtTime(meta.at)}` : ''}</p>
+      </section>`;
+
+    const cnyIn = $('#calc-cny');
+    cnyIn.addEventListener('input', () => { calcCny = cnyIn.value; ls.set('sb_calc_cny', calcCny); updateCalcResult(); });
+    const fIn = $('#calc-formula');
+    const syncDraft = () => {
+      calcDraft = { formula: fIn.value, round_unit: +$('#calc-unit').value, round_mode: $('#calc-mode').value };
+      updateCalcResult();
+    };
+    fIn.addEventListener('input', syncDraft);
+    $('#calc-unit').addEventListener('change', syncDraft);
+    $('#calc-mode').addEventListener('change', syncDraft);
+    $('#calc .chips').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ins]'); if (!b) return;
+      const s = fIn.selectionStart ?? fIn.value.length, en = fIn.selectionEnd ?? s;
+      fIn.value = fIn.value.slice(0, s) + b.dataset.ins + fIn.value.slice(en);
+      fIn.focus();
+      fIn.selectionStart = fIn.selectionEnd = s + b.dataset.ins.length;
+      syncDraft();
+    });
+    const useManual = $('#use-manual'), manual = $('#manual-rate');
+    const saveManual = debounce(async () => {
+      const next = { ...state.settings.calc, use_manual: useManual.checked, manual_rate: decOrNull(manual.value) };
+      try { await saveSetting('calc', next); } catch (err) { toast('수동 환율을 저장하지 못했습니다: ' + err.message, true); }
+      onRateChange();
+    }, 500);
+    useManual.addEventListener('change', () => { manual.disabled = !useManual.checked; if (useManual.checked) manual.focus(); state.settings.calc.use_manual = useManual.checked; onRateChange(); saveManual(); });
+    manual.addEventListener('input', () => { state.settings.calc.manual_rate = decOrNull(manual.value); onRateChange(); saveManual(); });
+
+    updateCalcRate();
+    updateCalcResult();
+  }
+
+  function updateCalcRate() {
+    const v = $('#rate-val'); if (!v) return;
+    const r = currentRate();
+    v.innerHTML = rate.loading && !r ? '불러오는 중…' : r ? `${fmtNum(r, 2)}<small> 원 / 1위안</small>` : '-';
+    $('#rate-meta').textContent = rateDesc();
+    $('#rate-err').textContent = rate.error && !(state.settings.calc.use_manual && state.settings.calc.manual_rate) ? rate.error : '';
+  }
+
+  function updateCalcResult() {
+    const out = $('#calc-out'); if (!out) return;
+    const saved = state.settings.calc;
+    const draft = calcDraft || saved;
+    const isDraft = draft.formula !== saved.formula || +draft.round_unit !== +saved.round_unit || draft.round_mode !== saved.round_mode;
+    const err = $('#formula-err');
+    try { compile(draft.formula); err.textContent = ''; } catch (e2) { err.textContent = e2.message; }
+    const cny = decOrNull(calcCny);
+    if (cny == null) {
+      out.innerHTML = `<div class="calc-sub">위안화 금액을 입력하면 아래 계산법으로 최종금액을 계산합니다.</div>
+        <div class="calc-expr">${esc(draft.formula)}</div>${isDraft ? '<span class="draft-note">저장하지 않은 계산법입니다</span>' : ''}`;
+      return;
+    }
+    try {
+      const r = calcPrice(cny, { ...saved, ...draft });
+      out.innerHTML = `
+        <div class="calc-expr">${esc(explainFormula(draft.formula, cny, r.rate))}</div>
+        <div class="calc-expr">= ${fmtNum(r.raw, 2)}원 → ${roundLabel(draft)}</div>
+        <div class="calc-final"><strong>${fmtNum(r.final, 0)}원</strong>
+          <button class="btn small" data-act="copy-final" data-v="${r.final}">복사</button></div>
+        <div class="calc-sub">원화 환산(위안 × 환율): ${won(r.krw)}</div>
+        ${isDraft ? '<span class="draft-note">저장하지 않은 계산법으로 미리 계산한 값입니다</span>' : ''}`;
+    } catch (e2) {
+      out.innerHTML = `<div class="rate-err">${esc(e2.message)}</div>`;
+    }
+  }
+
+  async function saveCalcFormula() {
+    const d = { formula: $('#calc-formula').value.trim(), round_unit: +$('#calc-unit').value, round_mode: $('#calc-mode').value };
+    try { compile(d.formula); } catch (e) { toast('계산법을 확인해 주세요: ' + e.message, true); return; }
+    try {
+      await saveSetting('calc', { ...state.settings.calc, ...d });
+      toast('계산법을 저장했습니다. 이제부터 모든 계산에 적용됩니다.');
+      renderCalcPanel();
+      document.dispatchEvent(new CustomEvent('calcchange'));
+    } catch (e) { toast('저장하지 못했습니다: ' + e.message, true); }
+  }
+
+  /* =========================================================
+     폼 안의 위안화 → 최종금액 박스
+     ========================================================= */
+  function priceBoxHTML(row, finalLabel) {
+    return `
+      <div class="cny-box">
+        <div class="cny-top">
+          <label>위안화 가격 <small>¥ · 입력하면 저장된 계산법으로 자동 계산</small>
+            <input name="cny_price" inputmode="decimal" value="${row?.cny_price ?? ''}" placeholder="예: 12.5" autocomplete="off"></label>
+          <div class="cny-final"><span>${esc(finalLabel)}</span><strong data-final>-</strong></div>
+        </div>
+        <p class="cny-explain" data-explain></p>
+      </div>`;
+  }
+
+  /**
+   * 폼의 위안화 입력을 계산기와 연결.
+   * mode 'saved': 수정 화면에서 저장된 계산 결과를 그대로 보여줌 (다시 계산 버튼 제공)
+   * mode 'live' : 입력값이 바뀌면 현재 환율·계산법으로 다시 계산
+   */
+  function bindPriceBox(form, row, { finalField, onLive }) {
+    const input = form.querySelector('[name=cny_price]');
+    const out = form.querySelector('[data-final]');
+    const explain = form.querySelector('[data-explain]');
+    const st = { mode: row?.applied_text ? 'saved' : 'live', result: null };
+    const savedResult = row?.applied_text ? {
+      final: row[finalField], rate: row.applied_rate, formula: row.applied_formula, text: row.applied_text
+    } : null;
+
+    function render() {
+      const cny = decOrNull(input.value);
+      if (st.mode === 'saved' && savedResult && cny === decOrNull(row.cny_price)) {
+        st.result = savedResult;
+        out.textContent = won(savedResult.final);
+        const changed = savedResult.rate !== currentRate() || savedResult.formula !== state.settings.calc.formula;
+        explain.innerHTML = `저장된 계산: ${esc(savedResult.text)}${changed ? ` <button type="button" class="btn small recalc">현재 환율·계산법으로 다시 계산</button>` : ''}`;
+        return;
+      }
+      st.mode = 'live';
+      if (cny == null) { st.result = null; out.textContent = '-'; explain.textContent = '위안화 가격을 넣으면 계산 과정과 최종금액이 여기에 나옵니다.'; return; }
+      try {
+        const r = calcPrice(cny);
+        st.result = r;
+        out.textContent = won(r.final);
+        explain.textContent = '적용: ' + r.text;
+        onLive && onLive(r);
+      } catch (e) {
+        st.result = null;
+        out.textContent = '-';
+        explain.innerHTML = `<span style="color:var(--danger)">${esc(e.message)}</span>`;
+      }
+    }
+    input.addEventListener('input', () => { st.mode = 'live'; render(); });
+    explain.addEventListener('click', (e) => { if (e.target.closest('.recalc')) { st.mode = 'live'; render(); } });
+    const onCalc = () => { if (st.mode === 'live') render(); else render(); };
+    document.addEventListener('calcchange', onCalc);
+    modal.addEventListener('close', () => document.removeEventListener('calcchange', onCalc), { once: true });
+    render();
+    return {
+      payload() {
+        const cny = decOrNull(input.value);
+        const r = cny == null ? null : st.result;
+        return {
+          cny_price: cny,
+          applied_rate: r ? r.rate : null,
+          applied_formula: r ? r.formula : null,
+          applied_text: r ? r.text : null,
+          final: r ? Math.round(r.final) : null
+        };
+      }
+    };
+  }
+
+  /* =========================================================
+     라우팅
+     ========================================================= */
+  function currentDetailId() { const m = location.hash.match(/^#\/c\/([\w-]+)/); return m ? m[1] : null; }
+  function currentFolderId() { const m = location.hash.match(/^#\/f\/([\w-]+)/); return m ? m[1] : null; }
+
+  async function route(scroll = true) {
+    if (docCtx) await flushDoc();
+    if (docCtx && (!currentDetailId() || currentDetailId() !== docCtx.id || state.tab !== 'doc')) {
+      await flushDoc();
+      docCtx = null;
+    }
+    const id = currentDetailId();
+    if (id) await renderDetail(id);
+    else renderList(currentFolderId());
+    renderTree();
+    if (scroll) window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', () => route(true));
+
+  /* =========================================================
+     목록 (전체 / 폴더)
+     ========================================================= */
+  function renderList(folderId) {
+    const folder = folderId ? folderById(folderId) : null;
+    if (folderId && !folder) {
+      view.innerHTML = `<div class="empty"><h2>폴더를 찾을 수 없습니다</h2><p>삭제되었거나 주소가 잘못되었습니다.</p><a class="btn" href="#/">전체 후보로</a></div>`;
+      return;
+    }
+    const scope = folder ? itemsUnder(folder.id) : state.candidates;
+    const counts = Object.fromEntries(STATUSES.map((s) => [s, scope.filter((c) => c.status === s).length]));
+    const cats = [...new Set(scope.map((c) => c.category).filter(Boolean))].sort();
+    const authors = [...new Set(scope.map((c) => c.created_by).filter(Boolean))].sort();
     if (state.category && !cats.includes(state.category)) state.category = '';
+    if (state.author && !authors.includes(state.author)) state.author = '';
+    const path = folder ? folderPath(folder.id) : [];
 
     view.innerHTML = `
+      ${folder ? `<nav class="crumbs"><a href="#/">전체</a>${path.map((f) => ` / <a href="#/f/${f.id}">${esc(f.emoji || '📁')} ${esc(f.name)}</a>`).join('')}</nav>` : ''}
       <section class="list-head">
         <div>
-          <h1>신상품 후보</h1>
-          <p>후보 ${state.candidates.length}개 중 ${counts['선정']}개 선정</p>
+          <h1>${folder ? `<span class="folder-emoji">${esc(folder.emoji || '📁')}</span>${esc(folder.name)}` : '신상품 후보'}</h1>
+          <p>후보 ${scope.length}개 중 ${counts['선정']}개 선정${folder?.created_by ? ` · ${esc(folder.created_by)}님이 만든 폴더` : ''}</p>
         </div>
-        <button class="btn primary" data-act="new-candidate">후보 추가</button>
+        <div class="list-actions">
+          ${folder ? `<button class="btn" data-act="new-subfolder">하위 폴더</button>` : ''}
+          <button class="btn primary" data-act="new-candidate">${folder ? '이 폴더에 후보 추가' : '후보 추가'}</button>
+        </div>
       </section>
       <div class="toolbar">
         <div class="tabs" role="tablist">
           ${['all', ...STATUSES].map((s) => `
             <button role="tab" aria-selected="${state.status === s}" data-act="filter-status" data-v="${s}">
-              ${s === 'all' ? '전체' : s}<span class="count">${s === 'all' ? state.candidates.length : counts[s]}</span>
+              ${s === 'all' ? '전체' : s}<span class="count">${s === 'all' ? scope.length : counts[s]}</span>
             </button>`).join('')}
         </div>
         <div class="filters">
-          <input type="search" id="q" placeholder="상품명, 선정 이유, 메모 검색" value="${esc(state.q)}" aria-label="검색">
+          <input type="search" id="q" placeholder="상품명, 이유, 문서 내용 검색" value="${esc(state.q)}" aria-label="검색">
+          <select id="author" aria-label="작성자">
+            <option value="">모든 작성자</option>
+            ${authors.map((a) => `<option ${a === state.author ? 'selected' : ''}>${esc(a)}</option>`).join('')}
+          </select>
           <select id="cat" aria-label="카테고리">
             <option value="">모든 카테고리</option>
             ${cats.map((c) => `<option ${c === state.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}
@@ -865,38 +2034,44 @@ window.APP_CONFIG = {
       <div id="grid"></div>`;
 
     $('#q').addEventListener('input', debounce((e) => { state.q = e.target.value; renderGrid(); }, 150));
+    $('#author').addEventListener('change', (e) => { state.author = e.target.value; renderGrid(); });
     $('#cat').addEventListener('change', (e) => { state.category = e.target.value; renderGrid(); });
     $('#sort').addEventListener('change', (e) => { state.sort = e.target.value; renderGrid(); });
     renderGrid();
   }
 
+  const stripTags = (html) => String(html || '').replace(/<[^>]+>/g, ' ');
+
   async function renderGrid() {
+    const folderId = currentFolderId();
+    const scope = folderId ? itemsUnder(folderId) : state.candidates;
     const q = state.q.trim().toLowerCase();
-    let list = state.candidates.filter((c) =>
+    let list = scope.filter((c) =>
       (state.status === 'all' || c.status === state.status) &&
       (!state.category || c.category === state.category) &&
-      (!q || [c.title, c.category, c.reason, c.memo, c.target_customer].join(' ').toLowerCase().includes(q)));
+      (!state.author || c.created_by === state.author) &&
+      (!q || [c.title, c.category, c.reason, c.memo, c.target_customer, stripTags(c.doc_html)].join(' ').toLowerCase().includes(q)));
 
-    if (state.sort === 'updated') list = [...list].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
-    if (state.sort === 'priority') list = [...list].sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority) || b.created_at.localeCompare(a.created_at));
+    if (state.sort === 'new') list = [...list].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    if (state.sort === 'updated') list = [...list].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+    if (state.sort === 'priority') list = [...list].sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority) || String(b.created_at).localeCompare(String(a.created_at)));
 
     const grid = $('#grid');
     if (!grid) return;
 
-    if (!state.candidates.length) {
+    if (!scope.length) {
       grid.innerHTML = `
         <div class="empty">
-          <h2>아직 후보가 없습니다</h2>
-          <p>들여올 만한 상품을 발견하면 후보로 추가하고, 선정 이유와 소싱처 링크를 정리해 보세요.</p>
-          <button class="btn primary" data-act="new-candidate">첫 후보 추가</button>
+          <h2>${folderId ? '이 폴더는 비어 있습니다' : '아직 후보가 없습니다'}</h2>
+          <p>들여올 만한 상품을 발견하면 후보로 추가하고, 문서에 정리하고, 소싱처 링크를 붙여 비교해 보세요.</p>
+          <button class="btn primary" data-act="new-candidate">후보 추가</button>
         </div>`;
       return;
     }
     if (!list.length) {
-      grid.innerHTML = `<div class="empty"><h2>조건에 맞는 후보가 없습니다</h2><p>검색어나 상태 필터를 바꿔 보세요.</p></div>`;
+      grid.innerHTML = `<div class="empty"><h2>조건에 맞는 후보가 없습니다</h2><p>검색어나 필터를 바꿔 보세요.</p></div>`;
       return;
     }
-
     await ensureUrls(list.map(coverOf));
     grid.innerHTML = `<div class="grid">${list.map(cardHTML).join('')}</div>`;
   }
@@ -905,27 +2080,30 @@ window.APP_CONFIG = {
     const cover = coverOf(c);
     const n = sourcesOf(c.id).length;
     const best = bestCostOf(c.id);
+    const folder = c.folder_id ? folderById(c.folder_id) : null;
+    const excerpt = c.reason || stripTags(c.doc_html).replace(/\s+/g, ' ').trim() || '아직 정리된 내용이 없습니다.';
     return `
       <a class="card" href="#/c/${c.id}">
-        <div class="thumb">${cover && imgUrl(cover) ? `<img src="${esc(imgUrl(cover))}" alt="" loading="lazy">` : '<span class="noimg">이미지 없음</span>'}</div>
+        <div class="thumb">${cover && imgUrl(cover) ? `<img src="${esc(imgUrl(cover))}" alt="" loading="lazy">` : `<span class="noimg" style="font-size:34px">${esc(c.emoji || '📄')}</span>`}</div>
         <div class="card-body">
           <div class="meta">
             <span class="pill s-${STATUS_KEY[c.status]}">${esc(c.status)}</span>
             ${c.priority === '높음' ? '<span class="prio">우선</span>' : ''}
             ${c.category ? `<span>${esc(c.category)}</span>` : ''}
+            ${folder ? `<span>${esc(folder.emoji || '📁')} ${esc(folder.name)}</span>` : ''}
           </div>
-          <h3>${esc(c.title)}</h3>
-          <p class="excerpt">${esc(c.reason || '선정 이유를 아직 적지 않았습니다.')}</p>
+          <h3>${c.emoji ? esc(c.emoji) + ' ' : ''}${esc(c.title)}</h3>
+          <p class="excerpt">${esc(excerpt)}</p>
           <div class="card-foot">
-            <span>소싱처 ${n}곳</span>
-            ${best ? `<span>${best.chosen ? '선택 원가' : '최저 원가'} <strong>${won(best.cost)}</strong></span>` : ''}
+            <span>${c.created_by ? whoHTML(c.created_by, '· ' + ago(c.created_at)) : '소싱처 ' + n + '곳'}</span>
+            ${best ? `<span>${best.chosen ? '선택 원가' : '최저 원가'} <strong>${won(best.cost)}</strong></span>` : n ? `<span>소싱처 ${n}곳</span>` : ''}
           </div>
         </div>
       </a>`;
   }
 
   /* =========================================================
-     상세 화면
+     상세 (문서 / 요약 / 소싱처 비교)
      ========================================================= */
   function shotsHTML(paths) {
     const set = esc(JSON.stringify(paths));
@@ -941,23 +2119,16 @@ window.APP_CONFIG = {
   async function renderDetail(id) {
     const c = state.candidates.find((x) => x.id === id);
     if (!c) {
-      view.innerHTML = `<div class="empty"><h2>후보를 찾을 수 없습니다</h2><p>삭제되었거나 주소가 잘못되었습니다.</p><a class="btn" href="#/">목록으로</a></div>`;
+      view.innerHTML = `<div class="empty"><h2>항목을 찾을 수 없습니다</h2><p>삭제되었거나 주소가 잘못되었습니다.</p><a class="btn" href="#/">전체 후보로</a></div>`;
       return;
     }
-    const srcs = sourcesOf(id).map((s) => ({ ...s, total: totalCost(s) }));
-    await ensureUrls([...(c.images || []), ...srcs.flatMap((s) => s.images || [])]);
-
-    const costs = srcs.map((s) => s.total).filter((v) => v != null);
-    const minCost = costs.length ? Math.min(...costs) : null;
-    const maxCost = costs.length ? Math.max(...costs) : null;
-    const sorted = [...srcs].sort((a, b) => (b.is_selected - a.is_selected) || ((a.total ?? Infinity) - (b.total ?? Infinity)));
-    const best = bestCostOf(id);
-    const m = best ? marginPct(c.target_price, best.cost) : null;
-
-    const para = (txt, ph) => txt ? nl2br(txt) : `<span class="placeholder">${ph}</span>`;
+    if (!['doc', 'info', 'sources'].includes(state.tab)) state.tab = 'doc';
+    const srcCount = sourcesOf(id).length;
+    const path = c.folder_id ? folderPath(c.folder_id) : [];
+    const edited = c.updated_by && (c.updated_by !== c.created_by || (new Date(c.updated_at) - new Date(c.created_at)) > 60000);
 
     view.innerHTML = `
-      <nav class="crumb"><a href="#/">← 목록으로</a></nav>
+      <nav class="crumbs"><a href="#/">전체</a>${path.map((f) => ` / <a href="#/f/${f.id}">${esc(f.emoji || '📁')} ${esc(f.name)}</a>`).join('')}</nav>
       <header class="detail-head">
         <div>
           <div class="meta">
@@ -965,39 +2136,73 @@ window.APP_CONFIG = {
             ${c.category ? `<span>${esc(c.category)}</span>` : ''}
             <span>우선순위 ${esc(c.priority)}</span>
           </div>
-          <h1>${esc(c.title)}</h1>
+          <h1><button class="title-emoji icon-btn" style="font-size:28px;width:44px;height:44px" data-act="item-emoji" title="아이콘 바꾸기">${esc(c.emoji || '📄')}</button>${esc(c.title)}</h1>
+          <div class="byline">
+            ${c.created_by ? whoHTML(c.created_by, '등록 · ' + ago(c.created_at)) : `<span>${ago(c.created_at)} 등록</span>`}
+            ${edited ? whoHTML(c.updated_by, '수정 · ' + ago(c.updated_at)) : ''}
+          </div>
         </div>
         <div class="head-actions">
           <select data-act="quick-status" aria-label="상태 바꾸기">
             ${STATUSES.map((s) => `<option ${s === c.status ? 'selected' : ''}>${s}</option>`).join('')}
           </select>
-          <button class="btn" data-act="edit-candidate">수정</button>
-          <button class="btn ghost danger" data-act="delete-candidate">삭제</button>
+          <button class="btn" data-act="edit-candidate">정보 수정</button>
+          <button class="btn ghost" data-act="item-more" aria-label="더보기">⋯</button>
         </div>
       </header>
+      <div class="dtabs" role="tablist">
+        <button role="tab" data-act="tab" data-v="doc" aria-selected="${state.tab === 'doc'}">📝 문서</button>
+        <button role="tab" data-act="tab" data-v="info" aria-selected="${state.tab === 'info'}">요약 · 이미지</button>
+        <button role="tab" data-act="tab" data-v="sources" aria-selected="${state.tab === 'sources'}">소싱처 비교<span class="n">${srcCount}</span></button>
+      </div>
+      <div id="tabbody"></div>`;
 
+    const body = $('#tabbody');
+    if (state.tab === 'doc') await renderDocTab(c, body);
+    else if (state.tab === 'info') await renderInfoTab(c, body);
+    else await renderSourcesTab(c, body);
+  }
+
+  async function renderInfoTab(c, body) {
+    const srcs = sourcesOf(c.id);
+    await ensureUrls([...(c.images || [])]);
+    const best = bestCostOf(c.id);
+    const m = best ? marginPct(c.target_price, best.cost) : null;
+    const para = (txt, ph) => txt ? nl2br(txt) : `<span class="placeholder">${ph}</span>`;
+    body.innerHTML = `
       <div class="detail-grid">
         <section class="panel gallery">
           ${(c.images || []).length
             ? `<div class="gallery-grid">${shotsHTML(c.images)}</div>`
             : `<div class="gallery-empty">상품 이미지를 복사한 뒤<br>이 화면에서 <kbd>Ctrl</kbd>+<kbd>V</kbd> 하면 바로 올라갑니다.</div>`}
-          <p class="hint">이 화면에서 <kbd>Ctrl</kbd>+<kbd>V</kbd>로 이미지를 붙여넣으면 자동 압축 후 추가됩니다. 이미지에 마우스를 올리면 복사할 수 있습니다.</p>
+          <p class="hint">이 탭에서 <kbd>Ctrl</kbd>+<kbd>V</kbd>로 이미지를 붙여넣으면 자동 압축 후 추가됩니다. 이미지에 마우스를 올리면 복사할 수 있습니다.</p>
         </section>
-
         <section class="panel">
           <div class="facts">
-            <div><span>목표 판매가</span><strong>${won(c.target_price)}</strong></div>
-            <div><span>${best?.chosen ? '선택한 소싱처 원가' : '최저 원가'}</span><strong>${best ? won(best.cost) : '-'}</strong></div>
+            <div><span>목표 판매가</span><strong>${won(c.target_price)}</strong>${c.cny_price != null ? `<span class="calc-note">¥${fmtNum(c.cny_price)} 기준 계산</span>` : ''}</div>
+            <div><span>${best?.chosen ? '선택한 소싱처 원가' : '최저 원가'}</span><strong>${best ? won(best.cost) : '-'}</strong>${srcs.length ? `<span class="calc-note">소싱처 ${srcs.length}곳</span>` : ''}</div>
             <div><span>예상 마진율</span><strong class="${m == null ? '' : m >= 30 ? 'good' : m < 10 ? 'bad' : ''}">${m == null ? '-' : m + '%'}</strong></div>
           </div>
-          <article class="note"><h2>선정 이유</h2><div class="prose lead">${para(c.reason, '왜 이 상품이어야 하는지 아직 적지 않았습니다.')}</div></article>
+          ${c.applied_text ? `<article class="note"><h2>판매가 계산</h2><div class="prose" style="font-variant-numeric:tabular-nums">${esc(c.applied_text)}</div></article>` : ''}
+          <article class="note"><h2>선정 이유</h2><div class="prose lead">${para(c.reason, '정보 수정에서 선정 이유를 적거나, 문서 탭에 자유롭게 정리하세요.')}</div></article>
           <article class="note"><h2>타깃 고객</h2><div class="prose">${para(c.target_customer, '-')}</div></article>
           <article class="note"><h2>경쟁 상품 · 리스크</h2><div class="prose">${para(c.risks, '-')}</div></article>
           ${c.memo ? `<article class="note"><h2>메모</h2><div class="prose">${nl2br(c.memo)}</div></article>` : ''}
         </section>
-      </div>
+      </div>`;
+  }
 
-      <section class="compare">
+  async function renderSourcesTab(c, body) {
+    const srcs = sourcesOf(c.id).map((s) => ({ ...s, total: totalCost(s) }));
+    await ensureUrls(srcs.flatMap((s) => s.images || []));
+    const costs = srcs.map((s) => s.total).filter((v) => v != null);
+    const minCost = costs.length ? Math.min(...costs) : null;
+    const maxCost = costs.length ? Math.max(...costs) : null;
+    const sorted = [...srcs].sort((a, b) => (b.is_selected - a.is_selected) || ((a.total ?? Infinity) - (b.total ?? Infinity)));
+    const para = (txt, ph) => txt ? nl2br(txt) : `<span class="placeholder">${ph}</span>`;
+
+    body.innerHTML = `
+      <section>
         <div class="section-head">
           <h2>소싱처 비교<span>${srcs.length}곳</span></h2>
           <button class="btn primary" data-act="new-source">소싱처 추가</button>
@@ -1006,8 +2211,8 @@ window.APP_CONFIG = {
           <div class="table-wrap">
             <table class="cmp">
               <thead><tr>
-                <th>사이트</th><th>상품</th><th class="num">단가</th><th class="num">배송비</th>
-                <th>총 원가</th><th class="num">예상 마진율</th><th class="num">MOQ</th><th class="num">배송</th><th>평점 · 후기</th><th></th>
+                <th>사이트</th><th>상품</th><th class="num">위안가</th><th class="num">최종금액</th>
+                <th>총 원가</th><th class="num">마진율</th><th class="num">MOQ</th><th class="num">배송</th><th>등록</th><th></th>
               </tr></thead>
               <tbody>
                 ${sorted.map((s) => {
@@ -1030,8 +2235,8 @@ window.APP_CONFIG = {
                         </div>
                       </div>
                     </td>
-                    <td class="num">${won(s.unit_price)}</td>
-                    <td class="num">${won(s.shipping_fee)}</td>
+                    <td class="num">${yuan(s.cny_price)}</td>
+                    <td class="num" title="${esc(s.applied_text || '')}"><b>${won(s.final_price)}</b></td>
                     <td class="cost">
                       <div class="cost-val">${won(s.total)}</div>
                       ${s.total != null ? `<div class="cost-bar"><i style="width:${pct}%"></i></div>` : ''}
@@ -1039,7 +2244,7 @@ window.APP_CONFIG = {
                     <td class="num"><span class="margin ${mm == null ? '' : mm >= 30 ? 'good' : mm < 10 ? 'bad' : ''}">${mm == null ? '-' : mm + '%'}</span></td>
                     <td class="num">${s.moq ? s.moq.toLocaleString('ko-KR') + '개' : '-'}</td>
                     <td class="num">${s.lead_days ? s.lead_days + '일' : '-'}</td>
-                    <td class="rating">${esc(s.rating || '-')}</td>
+                    <td class="rating">${s.created_by ? whoHTML(s.created_by) : '-'}</td>
                     <td>
                       <div class="row-actions">
                         <button class="btn small ${s.is_selected ? '' : 'ghost'}" data-act="toggle-select" data-id="${s.id}">${s.is_selected ? '선택 해제' : '최종 선택'}</button>
@@ -1051,7 +2256,7 @@ window.APP_CONFIG = {
               </tbody>
             </table>
           </div>
-          <p class="hint">총 원가 = 단가 + 배송비. 마진율은 목표 판매가 기준이며 수수료·관부가세는 포함되지 않았습니다.</p>
+          <p class="hint">최종금액 = 위안가에 저장된 계산법을 적용한 값 (마우스를 올리면 계산 과정). 총 원가 = 단가 + 배송비, 마진율은 목표 판매가 기준입니다.</p>
 
           <div class="src-cards">
             ${sorted.map((s) => `
@@ -1060,23 +2265,420 @@ window.APP_CONFIG = {
                   <h3>${esc(s.site)}<small>${esc(s.product_name || '')}</small></h3>
                   <button class="btn small ghost" data-act="edit-source" data-id="${s.id}">수정</button>
                 </header>
+                ${s.applied_text ? `<p class="src-memo" style="font-variant-numeric:tabular-nums">💱 ${esc(s.applied_text)}</p>` : ''}
                 ${(s.pros || s.cons) ? `
                   <div class="pc">
                     <div class="pro"><h4>장점</h4>${para(s.pros, '-')}</div>
                     <div class="con"><h4>단점</h4>${para(s.cons, '-')}</div>
                   </div>` : ''}
+                ${s.rating ? `<p class="src-memo">평점 · 후기: ${esc(s.rating)}</p>` : ''}
                 ${s.memo ? `<p class="src-memo">${nl2br(s.memo)}</p>` : ''}
                 ${(s.images || []).length ? `<div class="src-shots">${shotsHTML(s.images)}</div>` : ''}
+                <p class="src-memo" style="font-size:12.5px">${s.created_by ? whoHTML(s.created_by, '등록 · ' + ago(s.created_at)) : ''}${s.updated_by && s.updated_by !== s.created_by ? ' · ' + esc(s.updated_by) + ' 수정' : ''}</p>
               </article>`).join('')}
           </div>
         ` : `
           <div class="empty">
             <h2>아직 소싱처가 없습니다</h2>
-            <p>1688, 도매꾹, 쿠팡 등에서 찾은 상품 링크를 추가하면 가격과 조건을 나란히 비교할 수 있습니다.</p>
+            <p>1688, 타오바오, 도매꾹 등에서 찾은 상품 링크를 추가하면 위안가가 자동으로 계산되고 가격·조건을 나란히 비교할 수 있습니다.</p>
             <button class="btn primary" data-act="new-source">소싱처 추가</button>
           </div>`}
       </section>`;
   }
+
+  /* =========================================================
+     문서 편집기
+     ========================================================= */
+  const ALLOWED = {
+    P: [], BR: [], H1: [], H2: [], H3: [], B: [], STRONG: [], I: [], EM: [], U: [], S: [], STRIKE: [], MARK: [],
+    UL: ['class'], OL: [], LI: ['class'], BLOCKQUOTE: [], HR: [], A: ['href'], IMG: ['data-path', 'src', 'alt'],
+    TABLE: [], THEAD: [], TBODY: [], TR: [], TD: ['colspan', 'rowspan'], TH: ['colspan', 'rowspan'], CODE: [], PRE: [], SUB: [], SUP: []
+  };
+  const DROP = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META', 'TITLE', 'HEAD', 'SVG', 'MATH', 'NOSCRIPT', 'TEMPLATE', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'FORM']);
+  const BLOCKISH = new Set(['DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'ASIDE', 'NAV', 'FIGURE', 'H4', 'H5', 'H6']);
+
+  function sanitize(html) {
+    const doc = new DOMParser().parseFromString(`<body><div id="__r">${html || ''}</div></body>`, 'text/html');
+    const root = doc.getElementById('__r');
+    (function walk(node) {
+      for (const child of [...node.childNodes]) {
+        if (child.nodeType === 8) { child.remove(); continue; }
+        if (child.nodeType !== 1) continue;
+        let el = child;
+        const tag = el.tagName;
+        if (DROP.has(tag)) { el.remove(); continue; }
+        if (tag === 'SPAN' || tag === 'FONT' || tag === 'LABEL' || tag === 'SMALL' || tag === 'BIG' || tag === 'CENTER' || (!ALLOWED[tag] && !BLOCKISH.has(tag))) {
+          const style = el.getAttribute('style') || '';
+          walk(el);
+          // 굵게/기울임 스타일만 있는 span은 태그로 바꿔 보존
+          const frag = doc.createDocumentFragment();
+          while (el.firstChild) frag.appendChild(el.firstChild);
+          let wrapped = frag;
+          if (/font-weight:\s*(bold|[6-9]00)/i.test(style)) { const b = doc.createElement('b'); b.appendChild(wrapped); wrapped = b; }
+          if (/font-style:\s*italic/i.test(style)) { const i = doc.createElement('i'); i.appendChild(wrapped); wrapped = i; }
+          el.replaceWith(wrapped);
+          continue;
+        }
+        if (BLOCKISH.has(tag)) {
+          const p = doc.createElement(/^H[4-6]$/.test(tag) ? 'h3' : 'p');
+          while (el.firstChild) p.appendChild(el.firstChild);
+          el.replaceWith(p);
+          el = p;
+        }
+        const allowed = ALLOWED[el.tagName] || [];
+        for (const a of [...el.attributes]) {
+          if (!allowed.includes(a.name)) { el.removeAttribute(a.name); continue; }
+          if (a.name === 'href' && !/^(https?:|mailto:)/i.test(a.value.trim())) el.removeAttribute('href');
+          if (a.name === 'src' && !/^https?:/i.test(a.value.trim())) el.removeAttribute('src');
+          if (a.name === 'class') {
+            const keep = a.value.split(/\s+/).filter((x) => x === 'checklist' || x === 'checked');
+            if (keep.length) el.setAttribute('class', keep.join(' ')); else el.removeAttribute('class');
+          }
+        }
+        if (el.tagName === 'IMG' && !el.getAttribute('data-path') && !el.getAttribute('src')) { el.remove(); continue; }
+        if (el.tagName === 'A') { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer'); }
+        walk(el);
+      }
+    })(root);
+    // 블록 안에 들어간 블록(p 안의 p) 정리는 브라우저에 맡기고, 빈 p 연속은 하나로
+    return root.innerHTML.replace(/(<p><\/p>){2,}/g, '<p></p>');
+  }
+  // A 태그의 target/rel 은 sanitize 내부에서 다시 붙이므로 허용 목록에 추가
+  ALLOWED.A.push('target', 'rel');
+
+  function serializeDoc(el) {
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('img.uploading').forEach((i) => i.remove());
+    clone.querySelectorAll('img[data-path]').forEach((i) => i.removeAttribute('src'));
+    const html = sanitize(clone.innerHTML).trim();
+    return /^(<p>(<br>)?<\/p>)?$/.test(html) ? '' : html;
+  }
+
+  async function hydrateDocImages(el) {
+    const imgs = [...el.querySelectorAll('img[data-path]')];
+    if (!imgs.length) return;
+    await ensureUrls(imgs.map((i) => i.dataset.path));
+    imgs.forEach((i) => { i.src = imgUrl(i.dataset.path); });
+  }
+
+  function setDocStatus(text, isErr = false) {
+    const s = $('#doc-status'); if (!s) return;
+    s.textContent = text;
+    s.classList.toggle('err', isErr);
+  }
+  function savedLabel(c) {
+    return c.doc_updated_by ? `${c.doc_updated_by} · ${ago(c.doc_updated_at)} 저장됨` : (c.doc_html ? '저장됨' : '자동 저장됩니다');
+  }
+
+  async function renderDocTab(c, body) {
+    body.innerHTML = `
+      <div id="doc-conflict"></div>
+      <div class="doc-toolbar" role="toolbar" aria-label="문서 서식">
+        <select data-cmd="block" aria-label="문단 형식">
+          <option value="p">본문</option><option value="h1">제목 1</option><option value="h2">제목 2</option><option value="h3">제목 3</option>
+        </select>
+        <span class="sep"></span>
+        <button type="button" data-cmd="bold" title="굵게 (Ctrl+B)"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="기울임 (Ctrl+I)"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="밑줄 (Ctrl+U)"><u>U</u></button>
+        <button type="button" data-cmd="strikeThrough" title="취소선"><s>S</s></button>
+        <button type="button" data-cmd="mark" title="형광펜"><mark style="background:#FFF0A0;padding:0 3px">가</mark></button>
+        <span class="sep"></span>
+        <button type="button" data-cmd="insertUnorderedList" title="글머리 목록">• 목록</button>
+        <button type="button" data-cmd="insertOrderedList" title="번호 목록">1. 목록</button>
+        <button type="button" data-cmd="checklist" title="체크리스트">☑ 할 일</button>
+        <button type="button" data-cmd="quote" title="인용">❝</button>
+        <button type="button" data-cmd="hr" title="구분선">―</button>
+        <span class="sep"></span>
+        <button type="button" data-cmd="link" title="링크">🔗</button>
+        <button type="button" data-cmd="image" title="이미지 (붙여넣기도 됩니다)">🖼️</button>
+        <button type="button" data-cmd="table" title="표">▦</button>
+        <span class="sep"></span>
+        <button type="button" data-cmd="undo" title="실행 취소 (Ctrl+Z)">↶</button>
+        <button type="button" data-cmd="redo" title="다시 실행 (Ctrl+Y)">↷</button>
+        <span class="spacer"></span>
+        <span class="doc-status" id="doc-status"></span>
+      </div>
+      <div class="doc-page">
+        <div class="doc-editor" id="doc-editor" contenteditable="true" spellcheck="false"
+          data-placeholder="여기에 자유롭게 정리하세요. 제목·목록·체크리스트·표를 쓸 수 있고, 이미지는 Ctrl+V로 붙여넣으면 압축되어 들어갑니다."></div>
+      </div>
+      <input type="file" id="doc-file" accept="image/*" multiple hidden>`;
+
+    const ed = $('#doc-editor');
+    ed.innerHTML = sanitize(c.doc_html || '');
+    if (!ed.textContent.trim() && !ed.querySelector('img,hr,table')) ed.innerHTML = '';
+    await hydrateDocImages(ed);
+    docCtx = { id: c.id, rev: c.doc_rev || 0, dirty: false, saving: false, timer: null, el: ed, range: null };
+    setDocStatus(savedLabel(c));
+    try { document.execCommand('defaultParagraphSeparator', false, 'p'); document.execCommand('styleWithCSS', false, false); } catch { /* ignore */ }
+
+    ed.addEventListener('input', markDocDirty);
+    ed.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); clearTimeout(docCtx?.timer); saveDoc(); }
+    });
+    ed.addEventListener('keyup', rememberRange);
+    ed.addEventListener('mouseup', rememberRange);
+    ed.addEventListener('click', (e) => {
+      const li = e.target.closest('ul.checklist > li');
+      if (li && e.offsetX < 26) { li.classList.toggle('checked'); markDocDirty(); return; }
+      const a = e.target.closest('a[href]');
+      if (a && (e.ctrlKey || e.metaKey)) { e.preventDefault(); window.open(a.href, '_blank', 'noopener'); }
+      const img = e.target.closest('img[data-path]');
+      if (img && e.detail === 2) {
+        const paths = $$('img[data-path]', ed).map((i) => i.dataset.path);
+        lb.paths = paths; lb.i = paths.indexOf(img.dataset.path); renderLightbox(); lightbox.showModal();
+      }
+    });
+    ed.addEventListener('paste', onDocPaste);
+    ed.addEventListener('drop', (e) => {
+      const files = imageFilesFrom(e.dataTransfer);
+      if (!files.length) return;
+      e.preventDefault();
+      if (document.caretRangeFromPoint) {
+        const r = document.caretRangeFromPoint(e.clientX, e.clientY);
+        if (r) { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+      }
+      insertDocImages(files);
+    });
+
+    const tb = body.querySelector('.doc-toolbar');
+    tb.addEventListener('mousedown', (e) => { if (e.target.closest('button')) { e.preventDefault(); } });
+    tb.addEventListener('click', (e) => { const b = e.target.closest('button[data-cmd]'); if (b) docCmd(b.dataset.cmd); });
+    tb.querySelector('select').addEventListener('change', (e) => { docCmd('block', e.target.value); e.target.value = 'p'; });
+    $('#doc-file').addEventListener('change', (e) => { insertDocImages([...e.target.files]); e.target.value = ''; });
+  }
+  document.addEventListener('selectionchange', () => syncBlockSelect());
+
+  function syncBlockSelect() {
+    if (!docCtx) return;
+    const sel = getSelection();
+    if (!sel.rangeCount || !docCtx.el.contains(sel.anchorNode)) return;
+    let n = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+    const block = n && n.closest('h1,h2,h3,p,li,blockquote');
+    const s = $('.doc-toolbar select');
+    if (s && block) s.value = /^H[1-3]$/.test(block.tagName) ? block.tagName.toLowerCase() : 'p';
+  }
+
+  function rememberRange() {
+    const sel = getSelection();
+    if (docCtx && sel.rangeCount && docCtx.el.contains(sel.anchorNode)) docCtx.range = sel.getRangeAt(0).cloneRange();
+  }
+  function restoreRange() {
+    if (!docCtx) return;
+    docCtx.el.focus();
+    const sel = getSelection();
+    if (docCtx.range && docCtx.el.contains(docCtx.range.startContainer)) { sel.removeAllRanges(); sel.addRange(docCtx.range); }
+    else if (!sel.rangeCount || !docCtx.el.contains(sel.anchorNode)) {
+      const r = document.createRange(); r.selectNodeContents(docCtx.el); r.collapse(false);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+  }
+  function selectionBlock(selector) {
+    const sel = getSelection();
+    if (!sel.rangeCount) return null;
+    let n = sel.anchorNode;
+    n = n.nodeType === 1 ? n : n.parentElement;
+    const hit = n && n.closest(selector);
+    return hit && docCtx.el.contains(hit) ? hit : null;
+  }
+
+  function docCmd(cmd, val) {
+    if (!docCtx) return;
+    restoreRange();
+    const ex = (c, v = null) => document.execCommand(c, false, v);
+    switch (cmd) {
+      case 'block': ex('formatBlock', `<${val}>`); break;
+      case 'quote': ex('formatBlock', selectionBlock('blockquote') ? '<p>' : '<blockquote>'); break;
+      case 'hr': ex('insertHorizontalRule'); break;
+      case 'mark': {
+        const m = selectionBlock('mark');
+        if (m) { m.replaceWith(...m.childNodes); break; }
+        const sel = getSelection();
+        if (!sel.rangeCount || sel.isCollapsed) { toast('형광펜을 칠할 글자를 먼저 선택하세요.'); return; }
+        const r = sel.getRangeAt(0);
+        const mk = document.createElement('mark');
+        mk.appendChild(r.extractContents());
+        r.insertNode(mk);
+        sel.removeAllRanges();
+        break;
+      }
+      case 'checklist': {
+        const ul = selectionBlock('ul');
+        if (ul && ul.classList.contains('checklist')) { ex('insertUnorderedList'); }
+        else if (ul) { ul.classList.add('checklist'); }
+        else { ex('insertUnorderedList'); const nu = selectionBlock('ul'); if (nu) nu.classList.add('checklist'); }
+        break;
+      }
+      case 'link': {
+        const sel = getSelection();
+        const had = sel.rangeCount && !sel.isCollapsed;
+        const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+        askText('링크 넣기', '주소', '', 'https://').then((u) => {
+          if (!u) return;
+          const url = normUrl(u);
+          docCtx.el.focus();
+          if (range) { const s = getSelection(); s.removeAllRanges(); s.addRange(range); }
+          if (had) ex('createLink', url);
+          else ex('insertHTML', `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>&nbsp;`);
+          markDocDirty();
+        });
+        return;
+      }
+      case 'image': rememberRange(); $('#doc-file').click(); return;
+      case 'table': {
+        const cells = (tag) => `<tr>${[0, 1, 2].map(() => `<${tag}><br></${tag}>`).join('')}</tr>`;
+        ex('insertHTML', `<table><thead>${cells('th')}</thead><tbody>${cells('td')}${cells('td')}</tbody></table><p><br></p>`);
+        break;
+      }
+      default: ex(cmd);
+    }
+    rememberRange();
+    markDocDirty();
+  }
+
+  async function onDocPaste(e) {
+    e.stopPropagation();
+    const files = imageFilesFrom(e.clipboardData);
+    if (files.length) { e.preventDefault(); insertDocImages(files); return; }
+    const html = e.clipboardData.getData('text/html');
+    if (html) {
+      e.preventDefault();
+      const clean = sanitize(html.replace(/<!--StartFragment-->|<!--EndFragment-->/g, ''));
+      document.execCommand('insertHTML', false, clean);
+      markDocDirty();
+      importExternalImages();
+    }
+    // 일반 텍스트는 브라우저 기본 동작
+  }
+
+  async function insertDocImages(files, atEnd = false) {
+    if (!docCtx) return;
+    const ctx = docCtx;
+    if (atEnd) { ctx.range = null; }
+    restoreRange();
+    for (const f of files) {
+      const tmp = 'up' + Math.random().toString(36).slice(2);
+      const local = URL.createObjectURL(f);
+      document.execCommand('insertHTML', false, `<img id="${tmp}" class="uploading" src="${local}" alt="">`);
+      rememberRange();
+      setDocStatus('이미지 압축 중…');
+      try {
+        const blob = await compressImage(f);
+        const path = await uploadBlob(blob);
+        await ensureUrls([path]);
+        const img = ctx.el.querySelector('#' + tmp);
+        if (img) {
+          img.src = imgUrl(path);
+          img.dataset.path = path;
+          img.classList.remove('uploading');
+          img.removeAttribute('id');
+        }
+        if (docCtx === ctx) markDocDirty();
+        toast(`이미지 추가됨 (${size(f.size)} → ${size(blob.size)})`);
+      } catch (err) {
+        ctx.el.querySelector('#' + tmp)?.remove();
+        toast('이미지를 올리지 못했습니다: ' + err.message, true);
+      } finally {
+        URL.revokeObjectURL(local);
+      }
+    }
+    refreshUsage();
+  }
+
+  async function importExternalImages() {
+    if (!docCtx) return;
+    const ctx = docCtx;
+    const imgs = $$('img:not([data-path])', ctx.el).filter((i) => /^https?:/i.test(i.getAttribute('src') || ''));
+    for (const img of imgs) {
+      try {
+        const r = await fetch(img.src, { mode: 'cors' });
+        if (!r.ok) throw new Error(r.status);
+        const blob = await compressImage(await r.blob());
+        const path = await uploadBlob(blob);
+        await ensureUrls([path]);
+        img.dataset.path = path;
+        img.src = imgUrl(path);
+        if (docCtx === ctx) markDocDirty();
+      } catch { /* 외부 주소 그대로 둠 */ }
+    }
+  }
+
+  function markDocDirty() {
+    if (!docCtx) return;
+    docCtx.dirty = true;
+    setDocStatus('수정 중…');
+    clearTimeout(docCtx.timer);
+    docCtx.timer = setTimeout(saveDoc, 1200);
+  }
+
+  async function flushDoc() {
+    if (!docCtx) return;
+    clearTimeout(docCtx.timer);
+    if (docCtx.dirty) await saveDoc();
+  }
+
+  async function saveDoc() {
+    const ctx = docCtx;
+    if (!ctx || !ctx.dirty) return;
+    if (ctx.saving) { ctx.timer = setTimeout(saveDoc, 600); return; }
+    if (ctx.el.querySelector('img.uploading')) { ctx.timer = setTimeout(saveDoc, 800); return; }
+    ctx.saving = true;
+    ctx.dirty = false;
+    setDocStatus('저장 중…');
+    const html = serializeDoc(ctx.el);
+    const now = new Date().toISOString();
+    const { data, error } = await sb.from('candidates')
+      .update({ doc_html: html, doc_rev: ctx.rev + 1, doc_updated_by: me, doc_updated_at: now, updated_by: me })
+      .eq('id', ctx.id).eq('doc_rev', ctx.rev).select('id, doc_rev, updated_at');
+    ctx.saving = false;
+    if (error) {
+      ctx.dirty = true;
+      setDocStatus('저장 실패 · 다시 시도합니다', true);
+      ctx.timer = setTimeout(saveDoc, 4000);
+      return;
+    }
+    if (!data || !data.length) { await showConflict(ctx); return; }
+    ctx.rev = data[0].doc_rev;
+    const c = state.candidates.find((x) => x.id === ctx.id);
+    if (c) Object.assign(c, { doc_html: html, doc_rev: ctx.rev, doc_updated_by: me, doc_updated_at: now, updated_by: me, updated_at: data[0].updated_at || now });
+    if (docCtx === ctx) setDocStatus(`${me || ''} · ${fmtTime(now)} 저장됨`);
+    if (ctx.dirty) { clearTimeout(ctx.timer); ctx.timer = setTimeout(saveDoc, 800); }
+  }
+
+  async function showConflict(ctx) {
+    ctx.dirty = true;
+    const { data } = await sb.from('candidates').select('doc_rev, doc_updated_by, doc_updated_at, doc_html').eq('id', ctx.id).single();
+    const box = $('#doc-conflict');
+    if (!box || docCtx !== ctx) return;
+    setDocStatus('저장 안 됨', true);
+    box.innerHTML = `
+      <div class="conflict">
+        ${data?.doc_updated_by ? esc(data.doc_updated_by) + '님이' : '다른 사람이'} 방금 이 문서를 수정했습니다. 내 변경 내용은 아직 저장되지 않았습니다.
+        <span class="spacer"></span>
+        <button class="btn small" data-conflict="theirs">최신 내용 불러오기</button>
+        <button class="btn small primary" data-conflict="mine">내 내용으로 덮어쓰기</button>
+      </div>`;
+    box.onclick = async (e) => {
+      const b = e.target.closest('[data-conflict]'); if (!b) return;
+      box.innerHTML = '';
+      if (b.dataset.conflict === 'mine') {
+        ctx.rev = data?.doc_rev ?? ctx.rev;
+        ctx.dirty = true;
+        saveDoc();
+      } else {
+        const c = state.candidates.find((x) => x.id === ctx.id);
+        if (c && data) Object.assign(c, data);
+        ctx.dirty = false;
+        docCtx = null;
+        await renderDetail(ctx.id);
+      }
+    };
+  }
+
+  window.addEventListener('beforeunload', (e) => {
+    if (docCtx && (docCtx.dirty || docCtx.saving)) { saveDoc(); e.preventDefault(); e.returnValue = ''; }
+  });
 
   /* =========================================================
      모달 공통
@@ -1110,7 +2712,8 @@ window.APP_CONFIG = {
       }
     });
     modal.showModal();
-    form.querySelector('input:not([type=hidden]), textarea')?.focus();
+    form.querySelector('input:not([type=hidden]):not([type=checkbox]), textarea')?.focus();
+    return form;
   }
 
   function closeModal() {
@@ -1121,35 +2724,48 @@ window.APP_CONFIG = {
   modal.addEventListener('close', () => { activeUploader?.dispose(); activeUploader = null; });
   modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
 
-  /* ---------- 후보 폼 ---------- */
-  function openCandidateForm(c) {
+  /* ---------- 후보(항목) 폼 ---------- */
+  function openCandidateForm(c, { folderId } = {}) {
     const cats = [...new Set(state.candidates.map((x) => x.category).filter(Boolean))];
     const v = (k) => esc(c?.[k] ?? '');
-    openModal(`
+    const fid = c ? c.folder_id : (folderId || null);
+    const form = openModal(`
       <form novalidate>
         <header class="modal-head">
-          <h2>${c ? '후보 수정' : '새 후보 추가'}</h2>
+          <h2>${c ? '정보 수정' : '새 후보 추가'}</h2>
           <button type="button" class="icon-btn" data-close aria-label="닫기">✕</button>
         </header>
         <div class="modal-body">
           <div class="row2">
-            <label>상품명 <input name="title" required value="${v('title')}" placeholder="예: 리넨 오버핏 셔츠"></label>
-            <label>카테고리 <input name="category" list="cat-list" value="${v('category')}" placeholder="예: 상의">
-              <datalist id="cat-list">${cats.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></label>
+            <label>상품명
+              <span style="display:flex;gap:8px">
+                <button type="button" class="btn" data-pick-emoji style="width:44px;padding:0;font-size:18px" title="아이콘">${esc(c?.emoji || '📄')}</button>
+                <input name="title" required value="${v('title')}" placeholder="예: 강아지 계단(16092026)">
+              </span>
+              <input type="hidden" name="emoji" value="${v('emoji')}">
+            </label>
+            <label>폴더 <select name="folder_id">${folderOptions(fid)}</select></label>
           </div>
           <div class="row3">
             <label>상태 <select name="status">${STATUSES.map((s) => `<option ${s === (c?.status || '검토중') ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
             <label>우선순위 <select name="priority">${PRIORITIES.map((s) => `<option ${s === (c?.priority || '보통') ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
-            <label>목표 판매가 <small>원</small><input name="target_price" inputmode="numeric" value="${c?.target_price ?? ''}" placeholder="29000"></label>
+            <label>카테고리 <input name="category" list="cat-list" value="${v('category')}" placeholder="예: 반려용품">
+              <datalist id="cat-list">${cats.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></label>
           </div>
-          <label>선정 이유 <small>왜 이 상품을 들여와야 하는지</small>
-            <textarea name="reason" rows="6" placeholder="수요·트렌드 근거, 기존 상품과의 연결, 시즌성, 가격 경쟁력 등">${v('reason')}</textarea></label>
-          <label>타깃 고객 <textarea name="target_customer" rows="2" placeholder="누가, 어떤 상황에서 살까요?">${v('target_customer')}</textarea></label>
-          <label>경쟁 상품 · 리스크 <textarea name="risks" rows="3" placeholder="비슷한 상품 판매처, 가격대, 반품·불량·인증 이슈 등">${v('risks')}</textarea></label>
+          ${priceBoxHTML(c, '계산된 판매가')}
+          <label>목표 판매가 <small>원 · 위안화를 넣으면 계산된 값이 자동으로 들어갑니다 (직접 고쳐도 됩니다)</small>
+            <input name="target_price" inputmode="numeric" value="${c?.target_price ?? ''}" placeholder="29000"></label>
+          <label>선정 이유 <small>한두 줄 요약 · 자세한 내용은 문서 탭에</small>
+            <textarea name="reason" rows="3" placeholder="수요·트렌드 근거, 기존 상품과의 연결, 시즌성, 가격 경쟁력 등">${v('reason')}</textarea></label>
+          <div class="row2" style="grid-template-columns:1fr 1fr">
+            <label>타깃 고객 <textarea name="target_customer" rows="2" placeholder="누가, 어떤 상황에서 살까요?">${v('target_customer')}</textarea></label>
+            <label>경쟁 상품 · 리스크 <textarea name="risks" rows="2" placeholder="비슷한 상품, 반품·불량·인증 이슈 등">${v('risks')}</textarea></label>
+          </div>
           <label>메모 <textarea name="memo" rows="2">${v('memo')}</textarea></label>
-          <div class="field">이미지 <div class="uploader"></div></div>
+          <div class="field">대표 이미지 <div class="uploader"></div></div>
         </div>
         <footer class="modal-foot">
+          <span class="muted" style="font-size:13px">${me ? whoHTML(me) + (c ? ' 이름으로 수정' : ' 이름으로 등록') : ''}</span>
           <span class="spacer"></span>
           <button type="button" class="btn" data-close>취소</button>
           <button type="submit" class="btn primary">${c ? '변경 저장' : '후보 추가'}</button>
@@ -1157,31 +2773,51 @@ window.APP_CONFIG = {
       </form>`,
     async (f, images) => {
       if (!f.title?.trim()) throw new Error('상품명을 입력해 주세요.');
+      const p = price.payload();
       const payload = {
-        title: f.title.trim(), category: f.category.trim() || null, status: f.status, priority: f.priority,
+        title: f.title.trim(), emoji: f.emoji || null, folder_id: f.folder_id || null,
+        category: f.category.trim() || null, status: f.status, priority: f.priority,
         target_price: numOrNull(f.target_price), reason: f.reason || null, target_customer: f.target_customer || null,
-        risks: f.risks || null, memo: f.memo || null, images
+        risks: f.risks || null, memo: f.memo || null, images,
+        cny_price: p.cny_price, applied_rate: p.applied_rate, applied_formula: p.applied_formula, applied_text: p.applied_text
       };
       if (c) {
-        const { error } = await sb.from('candidates').update(payload).eq('id', c.id);
+        if (c.folder_id !== payload.folder_id) payload.sort_order = Date.now() / 1000;
+        const { error } = await sb.from('candidates').update({ ...payload, ...stampUpd() }).eq('id', c.id);
         if (error) throw error;
         await loadAll();
         toast('변경 내용을 저장했습니다.');
-        await route();
+        await route(false);
       } else {
-        const { data, error } = await sb.from('candidates').insert(payload).select().single();
+        const { data, error } = await sb.from('candidates').insert({ ...payload, ...stampNew() }).select().single();
         if (error) throw error;
+        if (payload.folder_id) { state.expanded.add(payload.folder_id); persistExpanded(); }
         await loadAll();
-        toast('후보를 추가했습니다.');
+        toast('후보를 추가했습니다. 문서 탭에 자유롭게 정리해 보세요.');
+        state.tab = 'doc'; ls.set('sb_tab', 'doc');
         location.hash = '#/c/' + data.id;
       }
     }, c?.images);
+
+    const tp = form.querySelector('[name=target_price]');
+    tp.addEventListener('input', () => { tp.dataset.manual = '1'; });
+    const price = bindPriceBox(form, c, {
+      finalField: 'target_price',
+      onLive: (r) => { if (!tp.dataset.manual || !tp.value) { tp.value = Math.round(r.final); tp.dataset.manual = ''; } }
+    });
+    form.querySelector('[data-pick-emoji]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const em = await askEmoji(form.emoji.value);
+      if (em === undefined) return;
+      form.emoji.value = em;
+      btn.textContent = em || '📄';
+    });
   }
 
   /* ---------- 소싱처 폼 ---------- */
   function openSourceForm(candidateId, s) {
     const v = (k) => esc(s?.[k] ?? '');
-    openModal(`
+    const form = openModal(`
       <form novalidate>
         <header class="modal-head">
           <h2>${s ? '소싱처 수정' : '소싱처 추가'}</h2>
@@ -1195,9 +2831,10 @@ window.APP_CONFIG = {
             <label>사이트 <input name="site" list="site-list" value="${v('site')}" required placeholder="예: 1688">
               <datalist id="site-list">${SITES.map((x) => `<option value="${x}">`).join('')}</datalist></label>
           </div>
+          ${priceBoxHTML(s, '최종금액')}
           <div class="row4">
-            <label>단가 <small>원화 환산</small><input name="unit_price" inputmode="numeric" value="${s?.unit_price ?? ''}" placeholder="8500"></label>
-            <label>배송비 <small>개당</small><input name="shipping_fee" inputmode="numeric" value="${s?.shipping_fee ?? ''}" placeholder="1200"></label>
+            <label>단가 <small>원 · 위안×환율 자동</small><input name="unit_price" inputmode="numeric" value="${s?.unit_price ?? ''}" placeholder="2400"></label>
+            <label>배송비 <small>개당 원</small><input name="shipping_fee" inputmode="numeric" value="${s?.shipping_fee ?? ''}" placeholder="1200"></label>
             <label>MOQ <small>최소 수량</small><input name="moq" inputmode="numeric" value="${s?.moq ?? ''}"></label>
             <label>배송 기간 <small>일</small><input name="lead_days" inputmode="numeric" value="${s?.lead_days ?? ''}"></label>
           </div>
@@ -1211,7 +2848,8 @@ window.APP_CONFIG = {
           <label class="check"><input type="checkbox" name="is_selected" ${s?.is_selected ? 'checked' : ''}> 이 소싱처를 최종 선택으로 지정</label>
         </div>
         <footer class="modal-foot">
-          ${s ? '<button type="button" class="btn ghost danger" data-act="delete-source">삭제</button>' : ''}
+          ${s ? '<button type="button" class="btn ghost danger" data-del-source>삭제</button>' : ''}
+          <span class="muted" style="font-size:13px">${me ? whoHTML(me) + (s ? ' 이름으로 수정' : ' 이름으로 등록') : ''}</span>
           <span class="spacer"></span>
           <button type="button" class="btn" data-close>취소</button>
           <button type="submit" class="btn primary">${s ? '변경 저장' : '소싱처 추가'}</button>
@@ -1220,19 +2858,21 @@ window.APP_CONFIG = {
     async (f, images) => {
       const url = normUrl(f.url);
       const site = (f.site || '').trim() || guessSite(url || '') || '기타';
+      const p = price.payload();
       const payload = {
         candidate_id: candidateId, site, url, product_name: f.product_name || null,
         unit_price: numOrNull(f.unit_price), shipping_fee: numOrNull(f.shipping_fee),
         moq: numOrNull(f.moq), lead_days: numOrNull(f.lead_days), rating: f.rating || null,
         pros: f.pros || null, cons: f.cons || null, memo: f.memo || null,
-        is_selected: f.is_selected === 'on', images
+        is_selected: f.is_selected === 'on', images,
+        cny_price: p.cny_price, final_price: p.final, applied_rate: p.applied_rate, applied_formula: p.applied_formula, applied_text: p.applied_text
       };
       let savedId = s?.id;
       if (s) {
-        const { error } = await sb.from('sources').update(payload).eq('id', s.id);
+        const { error } = await sb.from('sources').update({ ...payload, ...stampUpd() }).eq('id', s.id);
         if (error) throw error;
       } else {
-        const { data, error } = await sb.from('sources').insert(payload).select().single();
+        const { data, error } = await sb.from('sources').insert({ ...payload, ...stampNew() }).select().single();
         if (error) throw error;
         savedId = data.id;
       }
@@ -1241,27 +2881,36 @@ window.APP_CONFIG = {
       }
       await loadAll();
       toast(s ? '소싱처를 저장했습니다.' : '소싱처를 추가했습니다.');
-      await renderDetail(candidateId);
+      state.tab = 'sources';
+      await route(false);
     }, s?.images);
 
-    const urlInput = modal.querySelector('input[name=url]');
-    const siteInput = modal.querySelector('input[name=site]');
+    const unit = form.querySelector('[name=unit_price]');
+    unit.addEventListener('input', () => { unit.dataset.manual = '1'; });
+    const price = bindPriceBox(form, s, {
+      finalField: 'final_price',
+      onLive: (r) => { if (!unit.dataset.manual || !unit.value) { unit.value = r.krw; unit.dataset.manual = ''; } }
+    });
+
+    const urlInput = form.querySelector('input[name=url]');
+    const siteInput = form.querySelector('input[name=site]');
     urlInput.addEventListener('input', () => {
       const g = guessSite(normUrl(urlInput.value) || '');
       if (g && (!siteInput.value || siteInput.dataset.auto === '1')) { siteInput.value = g; siteInput.dataset.auto = '1'; }
     });
     siteInput.addEventListener('input', () => { siteInput.dataset.auto = '0'; });
 
-    const del = modal.querySelector('[data-act=delete-source]');
+    const del = form.querySelector('[data-del-source]');
     if (del) del.addEventListener('click', async () => {
-      if (!confirm(`'${s.site}' 소싱처를 삭제할까요? 첨부 이미지도 함께 지워집니다.`)) return;
+      const ok = await confirmBox('소싱처 삭제', `'${esc(s.site)}' 소싱처를 삭제할까요? 첨부 이미지도 함께 지워집니다.`);
+      if (!ok) return;
       const { error } = await sb.from('sources').delete().eq('id', s.id);
       if (error) { toast('삭제하지 못했습니다: ' + error.message, true); return; }
       await removeFiles(s.images);
       closeModal();
       await loadAll();
       toast('소싱처를 삭제했습니다.');
-      await renderDetail(candidateId);
+      await route(false);
     });
   }
 
@@ -1303,35 +2952,46 @@ window.APP_CONFIG = {
     const c = id ? state.candidates.find((x) => x.id === id) : null;
 
     switch (act) {
-      case 'logout':
-        await sb.auth.signOut();
+      case 'logout': await flushDoc(); await sb.auth.signOut(); break;
+      case 'me': openWhoPicker(false); break;
+      case 'side-toggle': document.body.classList.toggle('side-open'); break;
+      case 'calc-toggle': setCalcOpen(!document.body.classList.contains('calc-open')); break;
+      case 'calc-close': setCalcOpen(false); break;
+      case 'rate-refresh': fetchRate(true); toast('환율을 다시 불러옵니다.'); break;
+      case 'calc-save': saveCalcFormula(); break;
+      case 'calc-reset':
+        $('#calc-formula').value = DEFAULT_CALC.formula;
+        $('#calc-unit').value = String(DEFAULT_CALC.round_unit);
+        $('#calc-mode').value = DEFAULT_CALC.round_mode;
+        $('#calc-formula').dispatchEvent(new Event('input'));
+        toast('기본 계산법을 불러왔습니다. 저장을 눌러야 적용됩니다.');
+        break;
+      case 'copy-final':
+        navigator.clipboard?.writeText(String(el.dataset.v)).then(() => toast(`${fmtNum(el.dataset.v, 0)} 을(를) 복사했습니다.`));
         break;
       case 'filter-status':
         state.status = el.dataset.v;
-        document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.v === state.status));
+        $$('.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.v === state.status));
         renderGrid();
         break;
-      case 'new-candidate':
-        openCandidateForm(null);
-        break;
-      case 'edit-candidate':
-        if (c) openCandidateForm(c);
-        break;
-      case 'delete-candidate': {
+      case 'new-candidate': openCandidateForm(null, { folderId: currentFolderId() }); break;
+      case 'new-subfolder': newFolder(currentFolderId()); break;
+      case 'edit-candidate': if (c) openCandidateForm(c); break;
+      case 'item-emoji': {
         if (!c) break;
-        const srcs = sourcesOf(c.id);
-        if (!confirm(`'${c.title}' 후보를 삭제할까요?\n소싱처 ${srcs.length}곳과 모든 이미지가 함께 지워집니다.`)) break;
-        const { error } = await sb.from('candidates').delete().eq('id', c.id);
-        if (error) { toast('삭제하지 못했습니다: ' + error.message, true); break; }
-        await removeFiles([...(c.images || []), ...srcs.flatMap((s) => s.images || [])]);
-        await loadAll();
-        toast('후보를 삭제했습니다.');
-        location.hash = '#/';
+        const em = await askEmoji(c.emoji); if (em === undefined) break;
+        await flushDoc();
+        await updateRow('candidates', c.id, { emoji: em || null, ...stampUpd() });
         break;
       }
-      case 'new-source':
-        if (c) openSourceForm(c.id, null);
+      case 'item-more': if (c) itemMenu(el, c); break;
+      case 'tab':
+        await flushDoc();
+        docCtx = null;
+        state.tab = el.dataset.v; ls.set('sb_tab', state.tab);
+        if (c) await renderDetail(c.id);
         break;
+      case 'new-source': if (c) openSourceForm(c.id, null); break;
       case 'edit-source': {
         const s = state.sources.find((x) => x.id === el.dataset.id);
         if (s) openSourceForm(s.candidate_id, s);
@@ -1342,7 +3002,7 @@ window.APP_CONFIG = {
         if (!s) break;
         const next = !s.is_selected;
         if (next) await sb.from('sources').update({ is_selected: false }).eq('candidate_id', s.candidate_id).neq('id', s.id);
-        const { error } = await sb.from('sources').update({ is_selected: next }).eq('id', s.id);
+        const { error } = await sb.from('sources').update({ is_selected: next, ...stampUpd() }).eq('id', s.id);
         if (error) { toast('바꾸지 못했습니다: ' + error.message, true); break; }
         await loadAll();
         toast(next ? `'${s.site}'을(를) 최종 선택했습니다.` : '최종 선택을 해제했습니다.');
@@ -1350,8 +3010,7 @@ window.APP_CONFIG = {
         break;
       }
       case 'copy-image':
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         copyImage(el.dataset.path);
         break;
       case 'open-lightbox':
@@ -1370,11 +3029,35 @@ window.APP_CONFIG = {
     if (e.target.dataset.act !== 'quick-status') return;
     const id = currentDetailId();
     const status = e.target.value;
-    const { error } = await sb.from('candidates').update({ status }).eq('id', id);
+    await flushDoc();
+    const { error } = await sb.from('candidates').update({ status, ...stampUpd() }).eq('id', id);
     if (error) { toast('상태를 바꾸지 못했습니다: ' + error.message, true); return; }
-    await loadAll();
+    const c = state.candidates.find((x) => x.id === id);
+    if (c) { c.status = status; c.updated_by = me; c.updated_at = new Date().toISOString(); }
     toast(`상태를 '${status}'(으)로 바꿨습니다.`);
-    await renderDetail(id);
+    if (state.tab === 'doc') {
+      // 문서 편집 중에는 편집기를 다시 그리지 않고 표시만 바꿈
+      const pill = $('.detail-head .pill');
+      if (pill) { pill.className = `pill s-${STATUS_KEY[status]}`; pill.textContent = status; }
+    } else await renderDetail(id);
+  });
+
+  // 다른 팀원이 바꾼 내용: 창으로 돌아오면 새로 불러오기
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible' || $('#app').hidden || modal.open || mini.open) return;
+    if (docCtx && (docCtx.dirty || docCtx.saving)) return;
+    const prevRev = docCtx ? docCtx.rev : null;
+    const prevCalc = JSON.stringify(state.settings.calc);
+    const ok = await loadAll();
+    if (!ok) return;
+    renderTree();
+    if (JSON.stringify(state.settings.calc) !== prevCalc) { renderCalcPanel(); document.dispatchEvent(new CustomEvent('calcchange')); }
+    if (docCtx) {
+      const c = state.candidates.find((x) => x.id === docCtx.id);
+      if (c && c.doc_rev !== prevRev && !docCtx.dirty) { docCtx = null; await renderDetail(c.id); }
+    } else {
+      route(false);
+    }
   });
 
   /* =========================================================
@@ -1385,11 +3068,12 @@ window.APP_CONFIG = {
       const { data: { session } } = await sb.auth.getSession();
       if (session) startApp(); else showLogin();
     } catch (err) {
-      window.__bootFail('Supabase에 연결하지 못했습니다: ' + err.message + ' (config의 URL과 키를 확인하세요)');
+      window.__bootFail('Supabase에 연결하지 못했습니다: ' + err.message + ' (설정의 URL과 키를 확인하세요)');
     }
   })();
+  setInterval(() => { if (!$('#app').hidden) fetchRate(true); }, 30 * 60 * 1000);
 })();
 
-</script>
+  </script>
 </body>
 </html>
