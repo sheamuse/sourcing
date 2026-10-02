@@ -598,6 +598,15 @@ body.calc-open .calc { transform: none; visibility: visible; }
 .src-price span { display: block; font-size: 12px; color: var(--muted); }
 .src-price b { font-size: 18px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 
+.calc-pick { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 10px; align-items: end; }
+.calc-pick label { display: grid; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.calc-pick input, .calc-pick select { font-size: 15px; font-weight: 600; color: var(--ink); }
+.calc-pick-out { display: grid; gap: 2px; padding: 4px 0; }
+.calc-pick-out span { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.calc-pick-out b { font-size: 22px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.calc-pick-status { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); min-height: 1em; }
+@media (max-width: 600px) { .calc-pick { grid-template-columns: 1fr 1fr; } .calc-pick-out { grid-column: 1 / -1; } }
+
 </style>
 </head>
 <body>
@@ -2416,17 +2425,66 @@ window.APP_CONFIG = {
         </section>
         <section class="panel">
           <div class="facts">
-            <div><span>목표 판매가</span><strong>${won(c.target_price)}</strong>${c.cny_price != null ? `<span class="calc-note">¥${fmtNum(c.cny_price)} 기준 계산</span>` : ''}</div>
+            <div><span>목표 판매가</span><strong id="info-target">${won(c.target_price)}</strong></div>
             <div><span>${best?.chosen ? '선택한 소싱처 원가' : '최저 원가'}</span><strong>${best ? won(best.cost) : '-'}</strong>${srcs.length ? `<span class="calc-note">소싱처 ${srcs.length}곳</span>` : ''}</div>
             <div><span>예상 마진율</span><strong class="${m == null ? '' : m >= 30 ? 'good' : m < 10 ? 'bad' : ''}">${m == null ? '-' : m + '%'}</strong></div>
           </div>
-          ${c.applied_text ? `<article class="note"><h2>판매가 계산</h2><div class="prose" style="font-variant-numeric:tabular-nums">${esc(c.applied_text)}</div></article>` : ''}
+          <article class="note"><h2>판매가 계산</h2>
+            <div class="calc-pick">
+              <label>원가 (¥)<input id="info-cny" inputmode="decimal" value="${c.cny_price ?? ''}" placeholder="위안 금액"></label>
+              <label>계산법<select id="info-preset">${presetOptions(presetIdForRow(c))}</select></label>
+              <div class="calc-pick-out"><span>계산된 판매가</span><b id="info-final">-</b></div>
+            </div>
+            <p class="calc-pick-status" id="info-calc-status"></p>
+          </article>
           <article class="note"><h2>선정 이유</h2><div class="prose lead">${para(c.reason, '정보 수정에서 선정 이유를 적거나, 문서 탭에 자유롭게 정리하세요.')}</div></article>
           <article class="note"><h2>타깃 고객</h2><div class="prose">${para(c.target_customer, '-')}</div></article>
           <article class="note"><h2>경쟁 상품 · 리스크</h2><div class="prose">${para(c.risks, '-')}</div></article>
           ${c.memo ? `<article class="note"><h2>메모</h2><div class="prose">${nl2br(c.memo)}</div></article>` : ''}
         </section>
       </div>`;
+    bindInfoCalc(c);
+  }
+
+  /** 요약 탭: 원가·계산법을 바꾸면 바로 계산해서 저장 */
+  function bindInfoCalc(c) {
+    const cnyIn = $('#info-cny'), sel = $('#info-preset'), out = $('#info-final'), status = $('#info-calc-status');
+    if (!cnyIn) return;
+    const show = () => {
+      const cny = decOrNull(cnyIn.value);
+      if (cny == null) { out.textContent = '-'; return null; }
+      try { const r = calcPrice(cny, presetById(sel.value)); out.textContent = won(r.final); return r; }
+      catch (e) { out.textContent = '-'; status.textContent = e.message; return null; }
+    };
+    const save = async () => {
+      const cny = decOrNull(cnyIn.value);
+      const r = show();
+      if (cny != null && !r) return;
+      // 목표 판매가를 직접 고친 적이 없으면(비어 있거나 이전 계산값과 같으면) 같이 바꿈
+      const prevFinal = c.applied_text ? (c.applied_text.match(/→ ([\d,]+)원/) || [])[1] : null;
+      const autoTarget = c.target_price == null || (prevFinal && fmtNum(c.target_price, 0) === prevFinal);
+      const patch = {
+        cny_price: cny,
+        applied_rate: r ? r.rate : null, applied_formula: r ? r.formula : null, applied_text: r ? r.text : null,
+        ...(r && autoTarget ? { target_price: Math.round(r.final) } : {}),
+        ...stampUpd()
+      };
+      status.textContent = '저장 중…';
+      const { error } = await sb.from('candidates').update(patch).eq('id', c.id);
+      if (error) { status.textContent = '저장하지 못했습니다: ' + error.message; return; }
+      Object.assign(c, patch, { updated_at: new Date().toISOString() });
+      ls.set('sb_form_preset', sel.value);
+      $('#info-target').textContent = won(c.target_price);
+      const best = bestCostOf(c.id);
+      const m = best ? marginPct(c.target_price, best.cost) : null;
+      const mEl = $$('.facts strong')[2];
+      if (mEl) { mEl.textContent = m == null ? '-' : m + '%'; mEl.className = m == null ? '' : m >= 30 ? 'good' : m < 10 ? 'bad' : ''; }
+      status.textContent = r ? (autoTarget ? `저장됨 · 목표 판매가에 반영했습니다 (환율 ${fmtNum(r.rate, 2)})` : `저장됨 · 목표 판매가는 직접 입력한 값(${won(c.target_price)})을 유지합니다`) : '저장됨';
+    };
+    const saveSoon = debounce(save, 600);
+    cnyIn.addEventListener('input', () => { show(); status.textContent = ''; saveSoon(); });
+    sel.addEventListener('change', save);
+    show();
   }
 
   async function renderSourcesTab(c, body) {
