@@ -554,6 +554,45 @@ body.calc-open .calc { transform: none; visibility: visible; }
 .filters { flex-wrap: wrap; }
 .filters input { min-width: 180px; flex: 1; }
 
+/* ===== v3: 계산법 여러 개 · 문서 항목 · 발주서 ===== */
+.cny-top { grid-template-columns: 1fr 1fr auto; }
+@media (max-width: 600px) { .cny-top { grid-template-columns: 1fr 1fr; } }
+.preset-list { display: grid; gap: 6px; }
+.preset { display: grid; gap: 2px; text-align: left; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.preset:hover { border-color: var(--line-strong); }
+.preset.on { border-color: var(--accent); background: var(--accent-soft); }
+.preset .pn { font-weight: 700; font-size: 13.5px; }
+.preset .pf { font-size: 12px; color: var(--muted); word-break: break-all; }
+.preset.add { border-style: dashed; color: var(--muted); }
+.preset-editor { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.calc-others { display: grid; gap: 2px; }
+.other-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 6px 4px; border-radius: 6px; font-size: 13px; cursor: pointer; text-align: left; font-variant-numeric: tabular-nums; }
+.other-row:hover { background: var(--surface-2); }
+.other-row span { color: var(--muted); }
+
+.doc-rows { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.doc-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; text-decoration: none; }
+.doc-row + .doc-row { border-top: 1px solid var(--line); }
+.doc-row:hover { background: var(--surface-2); }
+.dr-ico { font-size: 20px; width: 26px; text-align: center; flex: none; }
+.dr-main { flex: 1; min-width: 0; display: grid; }
+.dr-main b { font-size: 15px; }
+.dr-main span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dr-meta { font-size: 12.5px; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+@media (max-width: 640px) { .dr-meta { display: none; } }
+
+.orders { padding: 6px 8px; margin-bottom: 16px; }
+.orders-head { font-weight: 700; font-size: 14px; padding: 8px 8px 6px; }
+.orders-head span { color: var(--muted); font-weight: 500; font-size: 13px; }
+.order-row { display: flex; align-items: center; gap: 12px; padding: 8px; border-top: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
+.order-row .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.modal.wide { width: min(980px, calc(100vw - 24px)); }
+.po-fs { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px 14px; margin: 0; }
+.po-fs legend { font-size: 13px; font-weight: 700; padding: 0 6px; }
+.po-edit td { padding: 6px 6px; }
+.po-edit input { padding: 7px 8px; }
+.po-edit tfoot td { background: var(--surface-2); font-variant-numeric: tabular-nums; }
+
 </style>
 </head>
 <body>
@@ -657,7 +696,16 @@ window.APP_CONFIG = {
     [/temu\.com/, '테무'], [/coupang\.com/, '쿠팡'], [/smartstore\.naver|shopping\.naver|brand\.naver/, '네이버 스마트스토어'],
     [/domeggook\.com/, '도매꾹'], [/domeme\.com/, '도매매'], [/ownerclan\.com/, '오너클랜'], [/amazon\./, '아마존']
   ];
-  const DEFAULT_CALC = { formula: '위안 * (환율 + 10) * 1.5 + 2500', round_unit: 1, round_mode: 'round', use_manual: false, manual_rate: null };
+  const DEFAULT_PRESET = { id: 'default', name: '기본', formula: '위안 * (환율 + 10) * 1.5 + 2500', round_unit: 1, round_mode: 'round' };
+  const DEFAULT_CALC = { presets: [DEFAULT_PRESET], default_id: 'default', use_manual: false, manual_rate: null };
+  function normalizeCalc(raw) {
+    raw = raw || {};
+    let presets = Array.isArray(raw.presets) ? raw.presets.filter((p) => p && p.id && p.formula) : [];
+    if (!presets.length && raw.formula) presets = [{ id: 'default', name: '기본', formula: raw.formula, round_unit: raw.round_unit ?? 1, round_mode: raw.round_mode || 'round' }];
+    if (!presets.length) presets = [{ ...DEFAULT_PRESET }];
+    const default_id = presets.some((p) => p.id === raw.default_id) ? raw.default_id : presets[0].id;
+    return { presets, default_id, use_manual: !!raw.use_manual, manual_rate: raw.manual_rate ?? null };
+  }
   const MEMBER_COLORS = ['#2346C8', '#C2410C', '#0F766E', '#9333EA', '#B91C1C', '#4D7C0F', '#0369A1'];
   const EMOJIS = ['📄', '📁', '📦', '✅', '⭐', '🔥', '💡', '📌', '🐶', '🐱', '🍷', '👜', '👕', '👗', '👟', '🧸', '🎁', '🍼',
     '🤰', '🔑', '🕯️', '🧴', '💄', '🏠', '🛋️', '🍳', '☕', '📱', '🎧', '⌚', '🌸', '🎄', '❄️', '☀️', '💰', '❓'];
@@ -733,9 +781,9 @@ window.APP_CONFIG = {
 
   const state = {
     candidates: [], sources: [], folders: [],
-    settings: { calc: { ...DEFAULT_CALC }, members: [] }, settingsMeta: {},
+    settings: { calc: normalizeCalc(null), members: [], company: {} }, settingsMeta: {}, orders: [],
     status: 'all', q: '', category: '', author: '', sort: 'new',
-    tab: ls.get('sb_tab', 'doc'),
+    tab: ls.get('sb_tab', 'info'),
     expanded: new Set(ls.get('sb_expanded', []))
   };
   let me = ls.get('sb_me', null);
@@ -846,7 +894,12 @@ window.APP_CONFIG = {
   const roundLabel = (c) => `${Number(c.round_unit) > 1 ? fmtNum(c.round_unit, 0) + '원' : '원'} 단위 ${ROUND_MODES[c.round_mode] || '반올림'}`;
 
   /** 위안 금액 → 최종금액. calc 설정과 환율을 받아 적용 과정을 글로 돌려준다 */
-  function calcPrice(cny, calc = state.settings.calc, rate = currentRate()) {
+  function presetById(id) {
+    const c = state.settings.calc;
+    return c.presets.find((p) => p.id === id) || c.presets.find((p) => p.id === c.default_id) || c.presets[0];
+  }
+  const defaultPreset = () => presetById(state.settings.calc.default_id);
+  function calcPrice(cny, calc = defaultPreset(), rate = currentRate()) {
     if (cny == null || cny === '' || !Number.isFinite(+cny)) return null;
     if (!rate) throw new Error('환율을 아직 불러오지 못했습니다. 계산기에서 수동 환율을 넣어 주세요.');
     const fn = compile(calc.formula);
@@ -854,8 +907,8 @@ window.APP_CONFIG = {
     if (!Number.isFinite(raw)) throw new Error('계산 결과가 올바르지 않습니다. 계산법을 확인해 주세요.');
     const final = roundBy(raw, calc.round_unit, calc.round_mode);
     const expr = explainFormula(calc.formula, +cny, +rate);
-    const text = `${expr} = ${fmtNum(raw, 2)}원 → ${fmtNum(final, 0)}원 (${roundLabel(calc)}, 환율 ${fmtNum(rate, 2)})`;
-    return { raw, final, rate: +rate, formula: calc.formula, text, krw: Math.round(cny * rate) };
+    const text = `${calc.name ? '[' + calc.name + '] ' : ''}${expr} = ${fmtNum(raw, 2)}원 → ${fmtNum(final, 0)}원 (${roundLabel(calc)}, 환율 ${fmtNum(rate, 2)})`;
+    return { raw, final, rate: +rate, formula: calc.formula, name: calc.name, text, krw: Math.round(cny * rate) };
   }
 
   /* =========================================================
@@ -964,15 +1017,16 @@ window.APP_CONFIG = {
      데이터
      ========================================================= */
   async function loadAll() {
-    const [c, s, f, st] = await Promise.all([
+    const [c, s, f, st, od] = await Promise.all([
       sb.from('candidates').select('*').order('created_at', { ascending: false }),
       sb.from('sources').select('*').order('created_at', { ascending: true }),
       sb.from('folders').select('*'),
-      sb.from('settings').select('*')
+      sb.from('settings').select('*'),
+      sb.from('orders').select('*').order('created_at', { ascending: false })
     ]);
-    const err = c.error || s.error || f.error || st.error;
+    const err = c.error || s.error || f.error || st.error || od.error;
     if (err) {
-      const needMigrate = /folders|settings|column|does not exist|schema cache/i.test(err.message);
+      const needMigrate = /folders|settings|orders|kind|column|does not exist|schema cache|relation/i.test(err.message);
       view.innerHTML = `<div class="empty"><h2>${needMigrate ? '데이터베이스 업데이트가 필요합니다' : '데이터를 불러오지 못했습니다'}</h2>
         <p>${needMigrate ? 'Supabase → SQL Editor에서 새 supabase-schema.sql 내용을 붙여넣고 Run 해주세요. 기존 데이터는 그대로 유지됩니다.' : esc(err.message)}</p>
         <button class="btn" onclick="location.reload()">다시 시도</button></div>`;
@@ -981,11 +1035,13 @@ window.APP_CONFIG = {
     state.candidates = c.data || [];
     state.sources = s.data || [];
     state.folders = f.data || [];
+    state.orders = od.data || [];
     (st.data || []).forEach((r) => {
       state.settings[r.key] = r.value;
       state.settingsMeta[r.key] = { by: r.updated_by, at: r.updated_at };
     });
-    state.settings.calc = { ...DEFAULT_CALC, ...(state.settings.calc || {}) };
+    state.settings.calc = normalizeCalc(state.settings.calc);
+    if (!state.settings.company || typeof state.settings.company !== 'object') state.settings.company = {};
     if (!Array.isArray(state.settings.members)) state.settings.members = [];
     return true;
   }
@@ -1257,7 +1313,7 @@ window.APP_CONFIG = {
     const html = e.clipboardData?.getData('text/html') || '';
     const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName);
     if (!files.length) {
-      const inContext = (modal.open && activeUploader) || (!modal.open && currentDetailId() && state.tab === 'info');
+      const inContext = (modal.open && activeUploader) || (!modal.open && currentDetailId() && state.tab === 'info' && !docCtx);
       if (inContext && /<img/i.test(html) && !typing) {
         toast('글과 함께 복사된 이미지는 가져올 수 없습니다. 이미지를 우클릭 → "이미지 복사" 후 붙여넣어 주세요.', true);
       }
@@ -1267,7 +1323,7 @@ window.APP_CONFIG = {
     const id = currentDetailId();
     if (id && !lightbox.open && !modal.open) {
       e.preventDefault();
-      if (state.tab === 'doc' && docCtx) { insertDocImages(files, true); return; }
+      if (docCtx && docCtx.id === id) { insertDocImages(files, true); return; }
       await quickAddImages(id, files);
     }
   });
@@ -1489,7 +1545,7 @@ window.APP_CONFIG = {
     const rowItem = (c, depth) => `
       <div class="tree-row item ${c.id === activeItem ? 'active' : ''}" style="--depth:${depth}" draggable="true" data-type="item" data-id="${c.id}">
         <span class="twisty blank"></span>
-        <span class="ico">${esc(c.emoji || '📄')}</span>
+        <span class="ico">${esc(c.emoji || (c.kind === 'doc' ? '📝' : '📦'))}</span>
         <a class="name" href="#/c/${c.id}" title="${esc(c.title)}${c.created_by ? ' · ' + esc(c.created_by) : ''}">${esc(c.title)}</a>
         <button class="kebab" data-act="tree-menu" aria-label="메뉴">⋮</button>
       </div>`;
@@ -1545,7 +1601,8 @@ window.APP_CONFIG = {
   function folderMenu(anchor, f) {
     if (!f) return;
     openMenu(anchor, [
-      { icon: '📄', label: '이 폴더에 새 항목', run: () => openCandidateForm(null, { folderId: f.id }) },
+      { icon: '📦', label: '이 폴더에 새 후보', run: () => openCandidateForm(null, { folderId: f.id }) },
+      { icon: '📝', label: '이 폴더에 새 문서', run: () => newDoc(f.id) },
       { icon: '📁', label: '하위 폴더 만들기', run: () => newFolder(f.id) },
       '-',
       { icon: '✏️', label: '이름 바꾸기', run: async () => {
@@ -1582,6 +1639,12 @@ window.APP_CONFIG = {
         await updateRow('candidates', c.id, { folder_id: to, sort_order: Date.now() / 1000, ...stampUpd() }, '항목을 옮겼습니다.');
         if (to) { state.expanded.add(to); persistExpanded(); renderTree(); }
       } },
+      ...(c.kind === 'doc'
+        ? [{ icon: '🖨️', label: 'PDF로 저장', run: () => exportDocPDF(c) }]
+        : [{ icon: '🖨️', label: '요약 + 최종 소싱처 PDF', run: () => exportSummaryPDF(c) },
+           { icon: '🖨️', label: '문서 PDF', run: () => exportDocPDF(c) },
+           { icon: '🧾', label: '발주서 만들기', run: () => openOrderForm(c, pickOrderSource(c)) }]),
+      '-',
       { icon: '🔗', label: '링크 복사', run: () => {
         navigator.clipboard?.writeText(location.href.split('#')[0] + '#/c/' + c.id).then(() => toast('링크를 복사했습니다.'));
       } },
@@ -1597,7 +1660,8 @@ window.APP_CONFIG = {
     const fid = currentFolderId() || (() => { const c = state.candidates.find((x) => x.id === currentDetailId()); return c?.folder_id || null; })();
     const inName = fid && folderById(fid) ? ` (${folderById(fid).name} 안에)` : '';
     openMenu(b, [
-      { icon: '📄', label: '새 항목' + inName, run: () => openCandidateForm(null, { folderId: fid }) },
+      { icon: '📦', label: '새 상품 후보' + inName, run: () => openCandidateForm(null, { folderId: fid }) },
+      { icon: '📝', label: '새 문서' + inName, run: () => newDoc(fid) },
       { icon: '📁', label: '새 폴더' + inName, run: () => newFolder(fid) }
     ]);
   });
@@ -1611,6 +1675,17 @@ window.APP_CONFIG = {
     await route(false);
     if (msg) toast(msg);
     return true;
+  }
+
+  async function newDoc(folderId) {
+    const title = await askText('새 문서', '문서 제목', '', '예: 샘플선정 회의록, 10월 신상 정리');
+    if (!title) return;
+    const { data, error } = await sb.from('candidates').insert({ title, kind: 'doc', folder_id: folderId || null, ...stampNew() }).select().single();
+    if (error) { toast('문서를 만들지 못했습니다: ' + error.message, true); return; }
+    if (folderId) { state.expanded.add(folderId); persistExpanded(); }
+    await loadAll();
+    location.hash = '#/c/' + data.id;
+    setTimeout(() => $('#doc-editor')?.focus(), 300);
   }
 
   async function newFolder(parentId) {
@@ -1740,10 +1815,14 @@ window.APP_CONFIG = {
   });
 
   /* =========================================================
-     환율 계산기 패널
+     환율 계산기 패널 (여러 계산법 저장)
      ========================================================= */
   let calcCny = ls.get('sb_calc_cny', '');
-  let calcDraft = null; // 저장 전 수정 중인 계산법
+  let calcSel = ls.get('sb_calc_sel', null);   // 계산하기에 쓰는 계산법
+  let editId = null;                              // 관리에서 고치는 계산법 ('__new' = 새로 만들기)
+  let calcDraft = null;
+  const presets = () => state.settings.calc.presets;
+  const cloneCalc = () => JSON.parse(JSON.stringify(state.settings.calc));
 
   function setCalcOpen(open) {
     document.body.classList.toggle('calc-open', open);
@@ -1752,9 +1831,17 @@ window.APP_CONFIG = {
     if (open) setTimeout(() => $('#calc-cny')?.focus(), 50);
   }
 
+  function presetOptions(selId) {
+    const c = state.settings.calc;
+    return c.presets.map((p) => `<option value="${esc(p.id)}" ${p.id === selId ? 'selected' : ''}>${p.id === c.default_id ? '★ ' : ''}${esc(p.name)}</option>`).join('');
+  }
+
   function renderCalcPanel() {
     const c = state.settings.calc;
-    calcDraft = { formula: c.formula, round_unit: c.round_unit, round_mode: c.round_mode };
+    calcSel = presetById(calcSel).id;
+    if (editId !== '__new' && !presets().some((p) => p.id === editId)) editId = calcSel;
+    const ed = editId === '__new' ? { id: '__new', name: '', formula: DEFAULT_PRESET.formula, round_unit: 1, round_mode: 'round' } : presetById(editId);
+    calcDraft = { name: ed.name, formula: ed.formula, round_unit: ed.round_unit, round_mode: ed.round_mode };
     const meta = state.settingsMeta.calc;
     $('#calc').innerHTML = `
       <div class="calc-head">
@@ -1776,46 +1863,75 @@ window.APP_CONFIG = {
       </section>
       <section class="calc-sec">
         <h3>계산하기</h3>
+        <label class="field" style="font-size:13px;font-weight:600">계산법
+          <select id="calc-sel">${presetOptions(calcSel)}</select></label>
         <label class="field" style="font-size:13px;font-weight:600">위안화 금액 (¥)
           <input id="calc-cny" class="calc-input" inputmode="decimal" placeholder="0" value="${esc(calcCny)}">
         </label>
         <div class="calc-out" id="calc-out"></div>
+        <div class="calc-others" id="calc-others"></div>
       </section>
       <section class="calc-sec">
-        <h3>계산법</h3>
-        <textarea id="calc-formula" class="formula" rows="2" spellcheck="false">${esc(c.formula)}</textarea>
-        <div class="chips">
-          <button type="button" data-ins="위안">위안</button><button type="button" data-ins="환율">환율</button>
-          <button type="button" data-ins=" + ">+</button><button type="button" data-ins=" - ">−</button>
-          <button type="button" data-ins=" * ">×</button><button type="button" data-ins=" / ">÷</button>
-          <button type="button" data-ins="(">(</button><button type="button" data-ins=")">)</button>
+        <h3>계산법 관리 <span style="font-weight:500">· ★ 표시가 상품 등록 기본값</span></h3>
+        <div class="preset-list">
+          ${presets().map((p) => `
+            <button type="button" class="preset ${p.id === editId ? 'on' : ''}" data-edit="${esc(p.id)}">
+              <span class="pn">${p.id === c.default_id ? '★ ' : ''}${esc(p.name)}</span>
+              <span class="pf">${esc(p.formula)}${+p.round_unit > 1 || p.round_mode !== 'round' ? ' · ' + roundLabel(p) : ''}</span>
+            </button>`).join('')}
+          <button type="button" class="preset add ${editId === '__new' ? 'on' : ''}" data-edit="__new"><span class="pn">+ 새 계산법</span></button>
         </div>
-        <div class="calc-row">
-          <label>끝자리 정리
-            <select id="calc-unit">
-              ${[1, 10, 100, 1000].map((u) => `<option value="${u}" ${+c.round_unit === u ? 'selected' : ''}>${u === 1 ? '원 단위' : fmtNum(u, 0) + '원 단위'}</option>`).join('')}
-            </select></label>
-          <label>방식
-            <select id="calc-mode">
-              ${Object.entries(ROUND_MODES).map(([k, v]) => `<option value="${k}" ${c.round_mode === k ? 'selected' : ''}>${v}</option>`).join('')}
-            </select></label>
+        <div class="preset-editor">
+          <label class="field" style="font-size:12.5px;font-weight:600">이름
+            <input id="pe-name" value="${esc(ed.name)}" placeholder="예: 기본 1.5배, 대량 1.3배, 쿠팡용" maxlength="30"></label>
+          <label class="field" style="font-size:12.5px;font-weight:600">계산식
+            <textarea id="calc-formula" class="formula" rows="2" spellcheck="false">${esc(ed.formula)}</textarea></label>
+          <div class="chips">
+            <button type="button" data-ins="위안">위안</button><button type="button" data-ins="환율">환율</button>
+            <button type="button" data-ins=" + ">+</button><button type="button" data-ins=" - ">−</button>
+            <button type="button" data-ins=" * ">×</button><button type="button" data-ins=" / ">÷</button>
+            <button type="button" data-ins="(">(</button><button type="button" data-ins=")">)</button>
+          </div>
+          <div class="calc-row">
+            <label>끝자리 정리
+              <select id="calc-unit">
+                ${[1, 10, 100, 1000].map((u) => `<option value="${u}" ${+ed.round_unit === u ? 'selected' : ''}>${u === 1 ? '원 단위' : fmtNum(u, 0) + '원 단위'}</option>`).join('')}
+              </select></label>
+            <label>방식
+              <select id="calc-mode">
+                ${Object.entries(ROUND_MODES).map(([k, v]) => `<option value="${k}" ${ed.round_mode === k ? 'selected' : ''}>${v}</option>`).join('')}
+              </select></label>
+          </div>
+          <p class="formula-err" id="formula-err"></p>
+          <div class="calc-expr" id="pe-preview"></div>
+          <div class="calc-actions" style="flex-wrap:wrap">
+            <button class="btn primary small" data-act="preset-save">${editId === '__new' ? '계산법 추가' : '변경 저장'}</button>
+            ${editId !== '__new' ? `
+              <button class="btn small" data-act="preset-copy">복사해서 새로</button>
+              ${editId !== c.default_id ? '<button class="btn small" data-act="preset-default">★ 기본으로</button>' : ''}
+              <button class="btn ghost small danger" data-act="preset-delete">삭제</button>` : ''}
+          </div>
         </div>
-        <p class="formula-err" id="formula-err"></p>
-        <div class="calc-actions">
-          <button class="btn primary" data-act="calc-save">계산법 저장</button>
-          <button class="btn ghost" data-act="calc-reset" title="${esc(DEFAULT_CALC.formula)}">기본값</button>
-        </div>
-        <p class="calc-meta">저장하면 팀 모두의 계산기와 상품 등록에 바로 적용됩니다.${meta?.by ? `<br>마지막 저장: ${esc(meta.by)} · ${fmtTime(meta.at)}` : ''}</p>
+        <p class="calc-meta">저장하면 팀 모두의 계산기와 상품 등록 화면에 바로 반영됩니다.${meta?.by ? `<br>마지막 저장: ${esc(meta.by)} · ${fmtTime(meta.at)}` : ''}</p>
       </section>`;
 
     const cnyIn = $('#calc-cny');
     cnyIn.addEventListener('input', () => { calcCny = cnyIn.value; ls.set('sb_calc_cny', calcCny); updateCalcResult(); });
+    $('#calc-sel').addEventListener('change', (e) => { calcSel = e.target.value; ls.set('sb_calc_sel', calcSel); updateCalcResult(); });
+    $('#calc .preset-list').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-edit]'); if (!b) return;
+      editId = b.dataset.edit;
+      if (editId !== '__new') { calcSel = editId; ls.set('sb_calc_sel', calcSel); }
+      renderCalcPanel();
+      $('#pe-name')?.focus();
+    });
     const fIn = $('#calc-formula');
     const syncDraft = () => {
-      calcDraft = { formula: fIn.value, round_unit: +$('#calc-unit').value, round_mode: $('#calc-mode').value };
-      updateCalcResult();
+      calcDraft = { name: $('#pe-name').value.trim(), formula: fIn.value, round_unit: +$('#calc-unit').value, round_mode: $('#calc-mode').value };
+      updateDraftPreview();
     };
     fIn.addEventListener('input', syncDraft);
+    $('#pe-name').addEventListener('input', syncDraft);
     $('#calc-unit').addEventListener('change', syncDraft);
     $('#calc-mode').addEventListener('change', syncDraft);
     $('#calc .chips').addEventListener('click', (e) => {
@@ -1828,7 +1944,7 @@ window.APP_CONFIG = {
     });
     const useManual = $('#use-manual'), manual = $('#manual-rate');
     const saveManual = debounce(async () => {
-      const next = { ...state.settings.calc, use_manual: useManual.checked, manual_rate: decOrNull(manual.value) };
+      const next = { ...cloneCalc(), use_manual: useManual.checked, manual_rate: decOrNull(manual.value) };
       try { await saveSetting('calc', next); } catch (err) { toast('수동 환율을 저장하지 못했습니다: ' + err.message, true); }
       onRateChange();
     }, 500);
@@ -1837,6 +1953,7 @@ window.APP_CONFIG = {
 
     updateCalcRate();
     updateCalcResult();
+    updateDraftPreview();
   }
 
   function updateCalcRate() {
@@ -1849,40 +1966,87 @@ window.APP_CONFIG = {
 
   function updateCalcResult() {
     const out = $('#calc-out'); if (!out) return;
-    const saved = state.settings.calc;
-    const draft = calcDraft || saved;
-    const isDraft = draft.formula !== saved.formula || +draft.round_unit !== +saved.round_unit || draft.round_mode !== saved.round_mode;
-    const err = $('#formula-err');
-    try { compile(draft.formula); err.textContent = ''; } catch (e2) { err.textContent = e2.message; }
+    const others = $('#calc-others');
+    const p = presetById(calcSel);
     const cny = decOrNull(calcCny);
     if (cny == null) {
-      out.innerHTML = `<div class="calc-sub">위안화 금액을 입력하면 아래 계산법으로 최종금액을 계산합니다.</div>
-        <div class="calc-expr">${esc(draft.formula)}</div>${isDraft ? '<span class="draft-note">저장하지 않은 계산법입니다</span>' : ''}`;
+      out.innerHTML = `<div class="calc-sub">위안화 금액을 넣으면 선택한 계산법으로 최종금액을 계산합니다.</div><div class="calc-expr">${esc(p.formula)}</div>`;
+      others.innerHTML = '';
       return;
     }
     try {
-      const r = calcPrice(cny, { ...saved, ...draft });
+      const r = calcPrice(cny, p);
       out.innerHTML = `
-        <div class="calc-expr">${esc(explainFormula(draft.formula, cny, r.rate))}</div>
-        <div class="calc-expr">= ${fmtNum(r.raw, 2)}원 → ${roundLabel(draft)}</div>
+        <div class="calc-expr">${esc(explainFormula(p.formula, cny, r.rate))}</div>
+        <div class="calc-expr">= ${fmtNum(r.raw, 2)}원 → ${roundLabel(p)}</div>
         <div class="calc-final"><strong>${fmtNum(r.final, 0)}원</strong>
           <button class="btn small" data-act="copy-final" data-v="${r.final}">복사</button></div>
-        <div class="calc-sub">원화 환산(위안 × 환율): ${won(r.krw)}</div>
-        ${isDraft ? '<span class="draft-note">저장하지 않은 계산법으로 미리 계산한 값입니다</span>' : ''}`;
+        <div class="calc-sub">원화 환산(위안 × 환율): ${won(r.krw)}</div>`;
+      const rest = presets().filter((x) => x.id !== p.id);
+      others.innerHTML = rest.length ? `<div class="calc-sub" style="margin:4px 0 2px">다른 계산법으로는</div>` + rest.map((x) => {
+        try { const rr = calcPrice(cny, x); return `<button type="button" class="other-row" data-pick-preset="${esc(x.id)}" title="${esc(x.formula)}"><span>${esc(x.name)}</span><b>${fmtNum(rr.final, 0)}원</b></button>`; }
+        catch { return `<div class="other-row"><span>${esc(x.name)}</span><b>-</b></div>`; }
+      }).join('') : '';
     } catch (e2) {
       out.innerHTML = `<div class="rate-err">${esc(e2.message)}</div>`;
+      others.innerHTML = '';
     }
   }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-pick-preset]'); if (!b) return;
+    calcSel = b.dataset.pickPreset; ls.set('sb_calc_sel', calcSel);
+    const s = $('#calc-sel'); if (s) s.value = calcSel;
+    updateCalcResult();
+  });
 
-  async function saveCalcFormula() {
-    const d = { formula: $('#calc-formula').value.trim(), round_unit: +$('#calc-unit').value, round_mode: $('#calc-mode').value };
-    try { compile(d.formula); } catch (e) { toast('계산법을 확인해 주세요: ' + e.message, true); return; }
+  function updateDraftPreview() {
+    const err = $('#formula-err'), pv = $('#pe-preview');
+    if (!err || !calcDraft) return;
+    try { compile(calcDraft.formula); err.textContent = ''; } catch (e2) { err.textContent = e2.message; pv.textContent = ''; return; }
+    const cny = decOrNull(calcCny) ?? 10;
     try {
-      await saveSetting('calc', { ...state.settings.calc, ...d });
-      toast('계산법을 저장했습니다. 이제부터 모든 계산에 적용됩니다.');
+      const r = calcPrice(cny, calcDraft);
+      pv.textContent = `미리보기: ¥${fmtNum(cny)} → ${fmtNum(r.final, 0)}원`;
+    } catch (e2) { pv.textContent = ''; }
+  }
+
+  async function savePreset(mode) {
+    const d = { name: $('#pe-name').value.trim(), formula: $('#calc-formula').value.trim(), round_unit: +$('#calc-unit').value, round_mode: $('#calc-mode').value };
+    try { compile(d.formula); } catch (e) { toast('계산식을 확인해 주세요: ' + e.message, true); return; }
+    const c = cloneCalc();
+    if (mode === 'copy' || editId === '__new') {
+      const id = 'p' + uid().replace(/-/g, '').slice(0, 8);
+      d.name = d.name || '새 계산법';
+      if (mode === 'copy') d.name = d.name + ' 복사본';
+      c.presets.push({ id, ...d });
+      editId = id; calcSel = id; ls.set('sb_calc_sel', id);
+    } else {
+      const p = c.presets.find((x) => x.id === editId);
+      if (!p) return;
+      Object.assign(p, d, { name: d.name || p.name });
+    }
+    try {
+      await saveSetting('calc', c);
+      toast(mode === 'copy' ? '복사본을 만들었습니다.' : '계산법을 저장했습니다.');
       renderCalcPanel();
       document.dispatchEvent(new CustomEvent('calcchange'));
     } catch (e) { toast('저장하지 못했습니다: ' + e.message, true); }
+  }
+  async function setDefaultPreset() {
+    const c = cloneCalc();
+    c.default_id = editId;
+    try { await saveSetting('calc', c); toast(`'${presetById(editId).name}'을(를) 기본 계산법으로 정했습니다.`); renderCalcPanel(); document.dispatchEvent(new CustomEvent('calcchange')); }
+    catch (e) { toast('저장하지 못했습니다: ' + e.message, true); }
+  }
+  async function deletePreset() {
+    if (presets().length <= 1) { toast('계산법은 최소 1개가 있어야 합니다.', true); return; }
+    const p = presetById(editId);
+    if (!(await confirmBox('계산법 삭제', `'${esc(p.name)}' 계산법을 삭제할까요?<br>이미 저장된 상품의 계산 기록은 그대로 남습니다.`))) return;
+    const c = cloneCalc();
+    c.presets = c.presets.filter((x) => x.id !== p.id);
+    if (c.default_id === p.id) c.default_id = c.presets[0].id;
+    try { await saveSetting('calc', c); editId = null; calcSel = c.default_id; toast('삭제했습니다.'); renderCalcPanel(); document.dispatchEvent(new CustomEvent('calcchange')); }
+    catch (e) { toast('삭제하지 못했습니다: ' + e.message, true); }
   }
 
   /* =========================================================
@@ -1892,8 +2056,10 @@ window.APP_CONFIG = {
     return `
       <div class="cny-box">
         <div class="cny-top">
-          <label>위안화 가격 <small>¥ · 입력하면 저장된 계산법으로 자동 계산</small>
+          <label>위안화 가격 <small>¥</small>
             <input name="cny_price" inputmode="decimal" value="${row?.cny_price ?? ''}" placeholder="예: 12.5" autocomplete="off"></label>
+          <label>계산법 <small>계산기에 저장된 것</small>
+            <select name="preset_id">${presetOptions(presetIdForRow(row))}</select></label>
           <div class="cny-final"><span>${esc(finalLabel)}</span><strong data-final>-</strong></div>
         </div>
         <p class="cny-explain" data-explain></p>
@@ -1905,8 +2071,19 @@ window.APP_CONFIG = {
    * mode 'saved': 수정 화면에서 저장된 계산 결과를 그대로 보여줌 (다시 계산 버튼 제공)
    * mode 'live' : 입력값이 바뀌면 현재 환율·계산법으로 다시 계산
    */
+  function presetIdForRow(row) {
+    if (row?.applied_formula) {
+      const byText = presets().find((p) => row.applied_text && row.applied_text.startsWith('[' + p.name + ']') && p.formula === row.applied_formula);
+      const byFormula = presets().find((p) => p.formula === row.applied_formula);
+      if (byText || byFormula) return (byText || byFormula).id;
+    }
+    return presetById(ls.get('sb_form_preset', state.settings.calc.default_id)).id;
+  }
+
   function bindPriceBox(form, row, { finalField, onLive }) {
     const input = form.querySelector('[name=cny_price]');
+    const sel = form.querySelector('[name=preset_id]');
+    const preset = () => presetById(sel.value);
     const out = form.querySelector('[data-final]');
     const explain = form.querySelector('[data-explain]');
     const st = { mode: row?.applied_text ? 'saved' : 'live', result: null };
@@ -1919,14 +2096,14 @@ window.APP_CONFIG = {
       if (st.mode === 'saved' && savedResult && cny === decOrNull(row.cny_price)) {
         st.result = savedResult;
         out.textContent = won(savedResult.final);
-        const changed = savedResult.rate !== currentRate() || savedResult.formula !== state.settings.calc.formula;
+        const changed = savedResult.rate !== currentRate() || savedResult.formula !== preset().formula;
         explain.innerHTML = `저장된 계산: ${esc(savedResult.text)}${changed ? ` <button type="button" class="btn small recalc">현재 환율·계산법으로 다시 계산</button>` : ''}`;
         return;
       }
       st.mode = 'live';
       if (cny == null) { st.result = null; out.textContent = '-'; explain.textContent = '위안화 가격을 넣으면 계산 과정과 최종금액이 여기에 나옵니다.'; return; }
       try {
-        const r = calcPrice(cny);
+        const r = calcPrice(cny, preset());
         st.result = r;
         out.textContent = won(r.final);
         explain.textContent = '적용: ' + r.text;
@@ -1938,8 +2115,13 @@ window.APP_CONFIG = {
       }
     }
     input.addEventListener('input', () => { st.mode = 'live'; render(); });
+    sel.addEventListener('change', () => { ls.set('sb_form_preset', sel.value); if (decOrNull(input.value) != null) { st.mode = 'live'; render(); } });
     explain.addEventListener('click', (e) => { if (e.target.closest('.recalc')) { st.mode = 'live'; render(); } });
-    const onCalc = () => { if (st.mode === 'live') render(); else render(); };
+    const onCalc = () => {
+      const keep = sel.value;
+      sel.innerHTML = presetOptions(presets().some((p) => p.id === keep) ? keep : state.settings.calc.default_id);
+      render();
+    };
     document.addEventListener('calcchange', onCalc);
     modal.addEventListener('close', () => document.removeEventListener('calcchange', onCalc), { once: true });
     render();
@@ -1987,7 +2169,7 @@ window.APP_CONFIG = {
       view.innerHTML = `<div class="empty"><h2>폴더를 찾을 수 없습니다</h2><p>삭제되었거나 주소가 잘못되었습니다.</p><a class="btn" href="#/">전체 후보로</a></div>`;
       return;
     }
-    const scope = folder ? itemsUnder(folder.id) : state.candidates;
+    const scope = (folder ? itemsUnder(folder.id) : state.candidates).filter((c) => c.kind !== 'doc');
     const counts = Object.fromEntries(STATUSES.map((s) => [s, scope.filter((c) => c.status === s).length]));
     const cats = [...new Set(scope.map((c) => c.category).filter(Boolean))].sort();
     const authors = [...new Set(scope.map((c) => c.created_by).filter(Boolean))].sort();
@@ -2004,6 +2186,7 @@ window.APP_CONFIG = {
         </div>
         <div class="list-actions">
           ${folder ? `<button class="btn" data-act="new-subfolder">하위 폴더</button>` : ''}
+          <button class="btn" data-act="new-doc">새 문서</button>
           <button class="btn primary" data-act="new-candidate">${folder ? '이 폴더에 후보 추가' : '후보 추가'}</button>
         </div>
       </section>
@@ -2031,7 +2214,8 @@ window.APP_CONFIG = {
           </select>
         </div>
       </div>
-      <div id="grid"></div>`;
+      <div id="grid"></div>
+      <div id="doclist"></div>`;
 
     $('#q').addEventListener('input', debounce((e) => { state.q = e.target.value; renderGrid(); }, 150));
     $('#author').addEventListener('change', (e) => { state.author = e.target.value; renderGrid(); });
@@ -2044,8 +2228,10 @@ window.APP_CONFIG = {
 
   async function renderGrid() {
     const folderId = currentFolderId();
-    const scope = folderId ? itemsUnder(folderId) : state.candidates;
+    const all = folderId ? itemsUnder(folderId) : state.candidates;
+    const scope = all.filter((c) => c.kind !== 'doc');
     const q = state.q.trim().toLowerCase();
+    renderDocList(all.filter((c) => c.kind === 'doc'), q);
     let list = scope.filter((c) =>
       (state.status === 'all' || c.status === state.status) &&
       (!state.category || c.category === state.category) &&
@@ -2074,6 +2260,27 @@ window.APP_CONFIG = {
     }
     await ensureUrls(list.map(coverOf));
     grid.innerHTML = `<div class="grid">${list.map(cardHTML).join('')}</div>`;
+  }
+
+  function renderDocList(docs, q) {
+    const box = $('#doclist');
+    if (!box) return;
+    const list = docs
+      .filter((d) => (!state.author || d.created_by === state.author) && (!q || [d.title, stripTags(d.doc_html)].join(' ').toLowerCase().includes(q)))
+      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+    box.innerHTML = list.length ? `
+      <div class="section-head" style="margin-top:36px"><h2>문서<span>${list.length}개</span></h2></div>
+      <div class="doc-rows">
+        ${list.map((d) => {
+          const folder = d.folder_id ? folderById(d.folder_id) : null;
+          const ex = stripTags(d.doc_html).replace(/\s+/g, ' ').trim();
+          return `<a class="doc-row" href="#/c/${d.id}">
+            <span class="dr-ico">${esc(d.emoji || '📝')}</span>
+            <span class="dr-main"><b>${esc(d.title)}</b><span>${esc(ex.slice(0, 90) || '빈 문서')}</span></span>
+            <span class="dr-meta">${folder ? esc(folder.emoji || '📁') + ' ' + esc(folder.name) + ' · ' : ''}${d.doc_updated_by ? whoHTML(d.doc_updated_by, '· ' + ago(d.doc_updated_at)) : whoHTML(d.created_by, '· ' + ago(d.created_at))}</span>
+          </a>`;
+        }).join('')}
+      </div>` : '';
   }
 
   function cardHTML(c) {
@@ -2122,7 +2329,8 @@ window.APP_CONFIG = {
       view.innerHTML = `<div class="empty"><h2>항목을 찾을 수 없습니다</h2><p>삭제되었거나 주소가 잘못되었습니다.</p><a class="btn" href="#/">전체 후보로</a></div>`;
       return;
     }
-    if (!['doc', 'info', 'sources'].includes(state.tab)) state.tab = 'doc';
+    if (c.kind === 'doc') { await renderDocOnly(c); return; }
+    if (!['doc', 'info', 'sources'].includes(state.tab)) state.tab = 'info';
     const srcCount = sourcesOf(id).length;
     const path = c.folder_id ? folderPath(c.folder_id) : [];
     const edited = c.updated_by && (c.updated_by !== c.created_by || (new Date(c.updated_at) - new Date(c.created_at)) > 60000);
@@ -2147,13 +2355,14 @@ window.APP_CONFIG = {
             ${STATUSES.map((s) => `<option ${s === c.status ? 'selected' : ''}>${s}</option>`).join('')}
           </select>
           <button class="btn" data-act="edit-candidate">정보 수정</button>
+          <button class="btn" data-act="export-menu">🖨️ PDF · 발주서</button>
           <button class="btn ghost" data-act="item-more" aria-label="더보기">⋯</button>
         </div>
       </header>
       <div class="dtabs" role="tablist">
-        <button role="tab" data-act="tab" data-v="doc" aria-selected="${state.tab === 'doc'}">📝 문서</button>
         <button role="tab" data-act="tab" data-v="info" aria-selected="${state.tab === 'info'}">요약 · 이미지</button>
         <button role="tab" data-act="tab" data-v="sources" aria-selected="${state.tab === 'sources'}">소싱처 비교<span class="n">${srcCount}</span></button>
+        <button role="tab" data-act="tab" data-v="doc" aria-selected="${state.tab === 'doc'}">📝 문서</button>
       </div>
       <div id="tabbody"></div>`;
 
@@ -2161,6 +2370,29 @@ window.APP_CONFIG = {
     if (state.tab === 'doc') await renderDocTab(c, body);
     else if (state.tab === 'info') await renderInfoTab(c, body);
     else await renderSourcesTab(c, body);
+  }
+
+  async function renderDocOnly(c) {
+    const path = c.folder_id ? folderPath(c.folder_id) : [];
+    const edited = c.doc_updated_by;
+    view.innerHTML = `
+      <nav class="crumbs"><a href="#/">전체</a>${path.map((f) => ` / <a href="#/f/${f.id}">${esc(f.emoji || '📁')} ${esc(f.name)}</a>`).join('')}</nav>
+      <header class="detail-head">
+        <div>
+          <h1><button class="title-emoji icon-btn" style="font-size:28px;width:44px;height:44px" data-act="item-emoji" title="아이콘 바꾸기">${esc(c.emoji || '📝')}</button>${esc(c.title)}</h1>
+          <div class="byline">
+            ${c.created_by ? whoHTML(c.created_by, '작성 · ' + ago(c.created_at)) : ''}
+            ${edited ? whoHTML(c.doc_updated_by, '마지막 수정 · ' + ago(c.doc_updated_at)) : ''}
+          </div>
+        </div>
+        <div class="head-actions">
+          <button class="btn" data-act="rename-item">이름 바꾸기</button>
+          <button class="btn" data-act="export-doc">🖨️ PDF 저장</button>
+          <button class="btn ghost" data-act="item-more" aria-label="더보기">⋯</button>
+        </div>
+      </header>
+      <div id="tabbody"></div>`;
+    await renderDocTab(c, $('#tabbody'));
   }
 
   async function renderInfoTab(c, body) {
@@ -2205,8 +2437,12 @@ window.APP_CONFIG = {
       <section>
         <div class="section-head">
           <h2>소싱처 비교<span>${srcs.length}곳</span></h2>
-          <button class="btn primary" data-act="new-source">소싱처 추가</button>
+          <div class="list-actions">
+            ${srcs.length ? '<button class="btn" data-act="new-order">🧾 발주서 만들기</button>' : ''}
+            <button class="btn primary" data-act="new-source">소싱처 추가</button>
+          </div>
         </div>
+        ${ordersHTML(c)}
         ${srcs.length ? `
           <div class="table-wrap">
             <table class="cmp">
@@ -2263,7 +2499,10 @@ window.APP_CONFIG = {
               <article class="panel src-card">
                 <header>
                   <h3>${esc(s.site)}<small>${esc(s.product_name || '')}</small></h3>
-                  <button class="btn small ghost" data-act="edit-source" data-id="${s.id}">수정</button>
+                  <span style="display:flex;gap:4px">
+                    <button class="btn small ghost" data-act="new-order" data-id="${s.id}">발주서</button>
+                    <button class="btn small ghost" data-act="edit-source" data-id="${s.id}">수정</button>
+                  </span>
                 </header>
                 ${s.applied_text ? `<p class="src-memo" style="font-variant-numeric:tabular-nums">💱 ${esc(s.applied_text)}</p>` : ''}
                 ${(s.pros || s.cons) ? `
@@ -2699,7 +2938,7 @@ window.APP_CONFIG = {
       btn.textContent = '저장 중…';
       try {
         const images = uploader ? await uploader.commit() : undefined;
-        await onSubmit(Object.fromEntries(new FormData(form)), images, form);
+        await onSubmit(Object.fromEntries(new FormData(form)), images, form, e.submitter);
         if (uploader) await removeFiles(uploader.removed());
         closeModal();
         refreshUsage();
@@ -2958,14 +3197,53 @@ window.APP_CONFIG = {
       case 'calc-toggle': setCalcOpen(!document.body.classList.contains('calc-open')); break;
       case 'calc-close': setCalcOpen(false); break;
       case 'rate-refresh': fetchRate(true); toast('환율을 다시 불러옵니다.'); break;
-      case 'calc-save': saveCalcFormula(); break;
-      case 'calc-reset':
-        $('#calc-formula').value = DEFAULT_CALC.formula;
-        $('#calc-unit').value = String(DEFAULT_CALC.round_unit);
-        $('#calc-mode').value = DEFAULT_CALC.round_mode;
-        $('#calc-formula').dispatchEvent(new Event('input'));
-        toast('기본 계산법을 불러왔습니다. 저장을 눌러야 적용됩니다.');
+      case 'preset-save': savePreset('save'); break;
+      case 'preset-copy': savePreset('copy'); break;
+      case 'preset-default': setDefaultPreset(); break;
+      case 'preset-delete': deletePreset(); break;
+      case 'new-doc': newDoc(currentFolderId()); break;
+      case 'rename-item': {
+        if (!c) break;
+        const title = await askText('이름 바꾸기', '제목', c.title); if (!title) break;
+        await updateRow('candidates', c.id, { title, ...stampUpd() }, '이름을 바꿨습니다.');
         break;
+      }
+      case 'export-doc': if (c) exportDocPDF(c); break;
+      case 'export-menu':
+        if (!c) break;
+        openMenu(el, [
+          { icon: '🖨️', label: '요약·이미지 + 최종 소싱처 PDF', run: () => exportSummaryPDF(c) },
+          { icon: '🖨️', label: '문서 PDF', run: () => exportDocPDF(c) },
+          '-',
+          { icon: '🧾', label: '발주서 만들기', run: () => openOrderForm(c, pickOrderSource(c)) }
+        ]);
+        break;
+      case 'new-order': {
+        if (!c) break;
+        const s = el.dataset.id ? state.sources.find((x) => x.id === el.dataset.id) : pickOrderSource(c);
+        openOrderForm(c, s);
+        break;
+      }
+      case 'edit-order': {
+        const o = state.orders.find((x) => x.id === el.dataset.id);
+        if (o && c) openOrderForm(c, state.sources.find((x) => x.id === o.source_id), o);
+        break;
+      }
+      case 'pdf-order': {
+        const o = state.orders.find((x) => x.id === el.dataset.id);
+        if (o) exportOrderPDF(o);
+        break;
+      }
+      case 'delete-order': {
+        const o = state.orders.find((x) => x.id === el.dataset.id);
+        if (!o || !(await confirmBox('발주서 삭제', `'${esc(o.po_number)}' 발주서를 삭제할까요?`))) break;
+        const { error } = await sb.from('orders').delete().eq('id', o.id);
+        if (error) { toast('삭제하지 못했습니다: ' + error.message, true); break; }
+        await loadAll();
+        toast('발주서를 삭제했습니다.');
+        await route(false);
+        break;
+      }
       case 'copy-final':
         navigator.clipboard?.writeText(String(el.dataset.v)).then(() => toast(`${fmtNum(el.dataset.v, 0)} 을(를) 복사했습니다.`));
         break;
@@ -3035,7 +3313,7 @@ window.APP_CONFIG = {
     const c = state.candidates.find((x) => x.id === id);
     if (c) { c.status = status; c.updated_by = me; c.updated_at = new Date().toISOString(); }
     toast(`상태를 '${status}'(으)로 바꿨습니다.`);
-    if (state.tab === 'doc') {
+    if (docCtx) {
       // 문서 편집 중에는 편집기를 다시 그리지 않고 표시만 바꿈
       const pill = $('.detail-head .pill');
       if (pill) { pill.className = `pill s-${STATUS_KEY[status]}`; pill.textContent = status; }
@@ -3072,6 +3350,511 @@ window.APP_CONFIG = {
     }
   })();
   setInterval(() => { if (!$('#app').hidden) fetchRate(true); }, 30 * 60 * 1000);
+
+  /* =========================================================
+     PDF 저장
+     ========================================================= */
+  const H2P_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+  const PDF_CSS = `
+    .pdf-root{background:#fff;color:#17201d;font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Microsoft YaHei",sans-serif;font-size:12.5px;line-height:1.6;width:700px;word-break:keep-all;overflow-wrap:anywhere}
+    .pdf-root *{box-sizing:border-box}
+    .pdf-root h1{font-size:24px;line-height:1.3;margin:4px 0 6px;letter-spacing:-.02em}
+    .pdf-root h2{font-size:14.5px;margin:22px 0 8px;padding-bottom:5px;border-bottom:1.5px solid #17201d}
+    .pdf-root h3{font-size:13px;margin:0 0 6px}
+    .pdf-root p{margin:0 0 6px}
+    .pdf-root a{color:#2346c8;text-decoration:none}
+    .pdf-kicker{font-size:11px;color:#66706c;display:flex;justify-content:space-between}
+    .pdf-meta{font-size:11.5px;color:#55605b}
+    .pdf-root table{width:100%;border-collapse:collapse}
+    .pdf-kv th,.pdf-kv td{border:1px solid #cfd5cf;padding:6px 9px;text-align:left;vertical-align:top}
+    .pdf-kv th{background:#f3f5f2;width:118px;font-weight:600;color:#3b4541;white-space:nowrap}
+    .pdf-facts{display:flex;border:1px solid #cfd5cf;border-radius:6px;margin-top:14px}
+    .pdf-facts>div{flex:1;padding:10px 12px}
+    .pdf-facts>div+div{border-left:1px solid #cfd5cf}
+    .pdf-facts span{display:block;font-size:11px;color:#66706c}
+    .pdf-facts b{font-size:17px}
+    .pdf-note{font-size:11px;color:#66706c;margin-top:4px}
+    .pdf-imgs{display:flex;flex-wrap:wrap;gap:8px}
+    .pdf-imgs img{width:222px;height:222px;object-fit:contain;border:1px solid #dde1dc;border-radius:4px;background:#fff}
+    .pdf-imgs.small img{width:150px;height:150px}
+    .pdf-cmp th,.pdf-cmp td{border:1px solid #cfd5cf;padding:5px 7px;font-size:11px;text-align:left}
+    .pdf-cmp th{background:#f3f5f2}
+    .pdf-cmp .num{text-align:right;white-space:nowrap}
+    .pdf-cmp tr.sel td{background:#e7ecfb;font-weight:600}
+    .pdf-pc{display:flex;gap:14px;margin-top:8px}
+    .pdf-pc>div{flex:1;border:1px solid #dde1dc;border-radius:6px;padding:8px 10px}
+    .pdf-pc h3{font-size:11.5px}
+    .pdf-root tr,.pdf-root img,.pdf-avoid{break-inside:avoid;page-break-inside:avoid}
+    .pdf-doc{font-size:13px;line-height:1.75}
+    .pdf-doc h1{font-size:20px;margin:18px 0 6px}
+    .pdf-doc h2{font-size:16px;border:0;padding:0;margin:16px 0 6px}
+    .pdf-doc h3{font-size:14px;margin:14px 0 4px}
+    .pdf-doc ul,.pdf-doc ol{padding-left:1.4em;margin:0 0 8px}
+    .pdf-doc ul.checklist{list-style:none;padding-left:0}
+    .pdf-doc blockquote{margin:0 0 8px;padding:2px 0 2px 12px;border-left:3px solid #c6ccc6;color:#55605b}
+    .pdf-doc hr{border:0;border-top:1px solid #c6ccc6;margin:14px 0}
+    .pdf-doc img{max-width:100%;height:auto;border-radius:4px;margin:4px 0}
+    .pdf-doc table td,.pdf-doc table th{border:1px solid #c6ccc6;padding:5px 8px;vertical-align:top}
+    .pdf-doc table th{background:#f3f5f2}
+    .pdf-root mark{background:#fff0a0;color:inherit}
+    .zh{color:#66706c;font-weight:500;font-size:.88em;margin-left:3px}
+    .po-top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-bottom:12px;border-bottom:2.5px solid #17201d}
+    .po-top h1{font-size:30px;letter-spacing:.3em;margin:0}
+    .po-top h1 .zh{letter-spacing:.2em;font-size:16px;display:block;margin:4px 0 0}
+    .po-meta{width:300px!important}
+    .po-meta th,.po-meta td{border:1px solid #cfd5cf;padding:5px 8px;text-align:left;font-size:11.5px}
+    .po-meta th{background:#f3f5f2;width:118px}
+    .po-parties{display:flex;gap:14px;margin-top:16px}
+    .po-parties>div{flex:1}
+    .po-parties h3{font-size:12.5px;background:#17201d;color:#fff;padding:5px 9px;margin:0;border-radius:4px 4px 0 0}
+    .po-parties td,.po-parties th{border:1px solid #cfd5cf;padding:5px 8px;text-align:left;font-size:11.5px;vertical-align:top}
+    .po-parties th{background:#f3f5f2;width:92px;white-space:nowrap}
+    .po-items{margin-top:16px}
+    .po-items th,.po-items td{border:1px solid #9aa39f;padding:7px 8px;font-size:12px}
+    .po-items thead th{background:#17201d;color:#fff;text-align:center}
+    .po-items .num{text-align:right;white-space:nowrap}
+    .po-items .c{text-align:center}
+    .po-items tfoot td{background:#f3f5f2;font-weight:600}
+    .po-items tfoot tr.grand td{background:#e7ecfb;font-size:14px;font-weight:800}
+    .po-terms{margin-top:14px}
+    .po-terms th,.po-terms td{border:1px solid #cfd5cf;padding:6px 9px;text-align:left;font-size:12px;vertical-align:top}
+    .po-terms th{background:#f3f5f2;width:130px;white-space:nowrap}
+    .po-img{display:flex;gap:10px;align-items:flex-start;margin-top:14px}
+    .po-img img{width:150px;height:150px;object-fit:contain;border:1px solid #dde1dc;border-radius:4px}
+    .po-sign{display:flex;gap:14px;margin-top:22px}
+    .po-sign>div{flex:1;border:1px solid #cfd5cf;border-radius:6px;padding:10px 12px;min-height:84px;font-size:12px;position:relative}
+    .po-items thead .zh,.po-parties h3 .zh{color:#c9d0cc}
+    .po-sign .stamp{position:absolute;right:14px;bottom:10px;color:#9aa39f}
+  `;
+
+  function loadScript(src) {
+    return new Promise((res, rej) => {
+      if (document.querySelector(`script[src="${src}"]`) && window.html2pdf) return res();
+      const s = document.createElement('script');
+      s.src = src; s.onload = () => res(); s.onerror = () => rej(new Error('PDF 도구를 불러오지 못했습니다'));
+      document.head.append(s);
+    });
+  }
+  function blobToDataURL(b) {
+    return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(b); });
+  }
+  const safeName = (s) => String(s || '문서').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const fmtDate = (ts) => { if (!ts) return ''; const t = new Date(ts); return `${t.getFullYear()}.${t.getMonth() + 1}.${t.getDate()}`; };
+
+  async function exportPDF(innerHTML, filename) {
+    toast('PDF 만드는 중…');
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-12000px;top:0;width:720px;background:#fff;';
+    holder.innerHTML = `<style>${PDF_CSS}</style><div class="pdf-root">${innerHTML}</div>`;
+    document.body.append(holder);
+    const root = holder.querySelector('.pdf-root');
+    // 이미지를 data URL로 바꿔서 PDF에 확실히 들어가게 함
+    await Promise.all($$('img', root).map(async (img) => {
+      try {
+        if (!img.src || img.src.startsWith('data:')) return;
+        const r = await fetch(img.src, { mode: 'cors' });
+        if (!r.ok) throw new Error(r.status);
+        img.src = await blobToDataURL(await r.blob());
+        if (img.decode) await img.decode().catch(() => {});
+      } catch { img.remove(); }
+    }));
+    try {
+      await loadScript(H2P_SRC);
+      await window.html2pdf().set({
+        margin: [12, 12, 14, 12],
+        filename: safeName(filename) + '.pdf',
+        image: { type: 'jpeg', quality: 0.94 },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'img', '.pdf-avoid'] }
+      }).from(root).save();
+      toast('PDF를 저장했습니다.');
+    } catch (err) {
+      console.warn(err);
+      printFallback(root.innerHTML, filename);
+    } finally {
+      holder.remove();
+    }
+  }
+
+  function printFallback(inner, title) {
+    const w = window.open('', '_blank');
+    if (!w) { toast('팝업이 막혀 PDF를 만들지 못했습니다. 팝업을 허용해 주세요.', true); return; }
+    w.document.write(`<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${esc(title)}</title>
+      <style>${PDF_CSS}@page{size:A4;margin:12mm}body{margin:0}.pdf-root{width:auto}</style></head>
+      <body><div class="pdf-root">${inner}</div><script>window.onload=function(){setTimeout(function(){print()},300)}<\/script></body></html>`);
+    w.document.close();
+    toast('인쇄 창에서 "PDF로 저장"을 선택하세요.');
+  }
+
+  /* ---------- 요약 · 이미지 + 최종 소싱처 ---------- */
+  function finalSourceOf(c) {
+    const srcs = sourcesOf(c.id);
+    const chosen = srcs.find((s) => s.is_selected);
+    if (chosen) return { s: chosen, note: '' };
+    const withCost = srcs.filter((s) => totalCost(s) != null).sort((a, b) => totalCost(a) - totalCost(b));
+    if (withCost.length) return { s: withCost[0], note: '최종 선택된 소싱처가 없어 총 원가가 가장 낮은 소싱처를 표시합니다.' };
+    if (srcs.length) return { s: srcs[0], note: '최종 선택된 소싱처가 없어 첫 번째 소싱처를 표시합니다.' };
+    return { s: null, note: '등록된 소싱처가 없습니다.' };
+  }
+
+  async function exportSummaryPDF(c) {
+    await flushDoc();
+    const srcs = sourcesOf(c.id);
+    const { s: fin, note } = finalSourceOf(c);
+    await ensureUrls([...(c.images || []).slice(0, 6), ...(fin?.images || []).slice(0, 4)]);
+    const best = bestCostOf(c.id);
+    const m = best ? marginPct(c.target_price, best.cost) : null;
+    const folder = c.folder_id ? folderById(c.folder_id) : null;
+    const row = (k, v) => v || v === 0 ? `<tr><th>${k}</th><td>${v}</td></tr>` : '';
+    const section = (title, txt) => txt ? `<h2>${title}</h2><p>${nl2br(txt)}</p>` : '';
+    const html = `
+      <div class="pdf-kicker"><span>신상품 후보 요약</span><span>${fmtDate(Date.now())} · ${esc(me || '')} 출력</span></div>
+      <h1>${c.emoji ? esc(c.emoji) + ' ' : ''}${esc(c.title)}</h1>
+      <div class="pdf-meta">상태 ${esc(c.status)} · 우선순위 ${esc(c.priority)}${c.category ? ' · ' + esc(c.category) : ''}${folder ? ' · 폴더 ' + esc(folder.name) : ''}
+        ${c.created_by ? `<br>${esc(c.created_by)} 등록 (${fmtDate(c.created_at)})` : ''}${c.updated_by ? ` · ${esc(c.updated_by)} 최종 수정 (${fmtDate(c.updated_at)})` : ''}</div>
+      <div class="pdf-facts pdf-avoid">
+        <div><span>목표 판매가</span><b>${won(c.target_price)}</b></div>
+        <div><span>${best?.chosen ? '최종 소싱처 원가' : '최저 원가'}</span><b>${best ? won(best.cost) : '-'}</b></div>
+        <div><span>예상 마진율</span><b>${m == null ? '-' : m + '%'}</b></div>
+      </div>
+      ${c.applied_text ? `<div class="pdf-note">판매가 계산: ${esc(c.applied_text)}</div>` : ''}
+      ${section('선정 이유', c.reason)}
+      ${section('타깃 고객', c.target_customer)}
+      ${section('경쟁 상품 · 리스크', c.risks)}
+      ${section('메모', c.memo)}
+      ${(c.images || []).length ? `<h2>상품 이미지</h2><div class="pdf-imgs">${c.images.slice(0, 6).map((p) => `<img src="${esc(imgUrl(p))}">`).join('')}</div>` : ''}
+      <h2>최종 소싱처</h2>
+      ${note ? `<p class="pdf-note">${esc(note)}</p>` : ''}
+      ${fin ? `
+        <table class="pdf-kv pdf-avoid">
+          ${row('사이트', esc(fin.site))}
+          ${row('상품명', esc(fin.product_name || ''))}
+          ${row('링크', fin.url ? `<a href="${esc(fin.url)}">${esc(fin.url)}</a>` : '')}
+          ${row('위안가', fin.cny_price != null ? yuan(fin.cny_price) : '')}
+          ${row('최종금액', fin.final_price != null ? `<b>${won(fin.final_price)}</b>${fin.applied_text ? `<div class="pdf-note">${esc(fin.applied_text)}</div>` : ''}` : '')}
+          ${row('단가 / 배송비', `${won(fin.unit_price)} / ${won(fin.shipping_fee)}`)}
+          ${row('총 원가', won(totalCost(fin)))}
+          ${row('MOQ', fin.moq ? fin.moq.toLocaleString('ko-KR') + '개' : '')}
+          ${row('배송 기간', fin.lead_days ? fin.lead_days + '일' : '')}
+          ${row('평점 · 후기', esc(fin.rating || ''))}
+          ${row('메모', fin.memo ? nl2br(fin.memo) : '')}
+          ${row('등록', fin.created_by ? esc(fin.created_by) + ' · ' + fmtDate(fin.created_at) : '')}
+        </table>
+        ${(fin.pros || fin.cons) ? `<div class="pdf-pc pdf-avoid"><div><h3>장점</h3>${nl2br(fin.pros || '-')}</div><div><h3>단점</h3>${nl2br(fin.cons || '-')}</div></div>` : ''}
+        ${(fin.images || []).length ? `<div class="pdf-imgs small" style="margin-top:10px">${fin.images.slice(0, 4).map((p) => `<img src="${esc(imgUrl(p))}">`).join('')}</div>` : ''}
+      ` : ''}
+      ${srcs.length > 1 ? `
+        <h2>소싱처 비교 (${srcs.length}곳)</h2>
+        <table class="pdf-cmp">
+          <thead><tr><th>사이트</th><th>상품명</th><th class="num">위안가</th><th class="num">최종금액</th><th class="num">총 원가</th><th class="num">MOQ</th><th class="num">배송</th></tr></thead>
+          <tbody>${[...srcs].sort((a, b) => (totalCost(a) ?? 1e15) - (totalCost(b) ?? 1e15)).map((s) => `
+            <tr class="${fin && s.id === fin.id ? 'sel' : ''}"><td>${esc(s.site)}${s.is_selected ? ' ✓' : ''}</td><td>${esc(s.product_name || '')}</td>
+            <td class="num">${yuan(s.cny_price)}</td><td class="num">${won(s.final_price)}</td><td class="num">${won(totalCost(s))}</td>
+            <td class="num">${s.moq ? s.moq + '개' : '-'}</td><td class="num">${s.lead_days ? s.lead_days + '일' : '-'}</td></tr>`).join('')}
+          </tbody>
+        </table>` : ''}`;
+    await exportPDF(html, `${c.title}_요약`);
+  }
+
+  /* ---------- 문서 ---------- */
+  async function exportDocPDF(c) {
+    await flushDoc();
+    const fresh = state.candidates.find((x) => x.id === c.id) || c;
+    const holder = document.createElement('div');
+    holder.innerHTML = sanitize(fresh.doc_html || '');
+    const imgs = $$('img[data-path]', holder);
+    await ensureUrls(imgs.map((i) => i.dataset.path));
+    imgs.forEach((i) => { i.src = imgUrl(i.dataset.path); i.removeAttribute('data-path'); });
+    $$('ul.checklist > li', holder).forEach((li) => li.insertAdjacentText('afterbegin', li.classList.contains('checked') ? '☑ ' : '☐ '));
+    const body = holder.innerHTML.trim() || '<p style="color:#66706c">(빈 문서)</p>';
+    const html = `
+      <div class="pdf-kicker"><span>${c.kind === 'doc' ? '문서' : '후보 문서'}</span><span>${fmtDate(Date.now())} · ${esc(me || '')} 출력</span></div>
+      <h1>${fresh.emoji ? esc(fresh.emoji) + ' ' : ''}${esc(fresh.title)}</h1>
+      <div class="pdf-meta">${fresh.created_by ? esc(fresh.created_by) + ' 작성' : ''}${fresh.doc_updated_by ? ` · ${esc(fresh.doc_updated_by)} 마지막 수정 (${fmtDate(fresh.doc_updated_at)})` : ''}</div>
+      <hr style="border:0;border-top:1.5px solid #17201d;margin:12px 0 16px">
+      <div class="pdf-doc">${body}</div>`;
+    await exportPDF(html, `${fresh.title}_문서`);
+  }
+
+  /* =========================================================
+     발주서
+     ========================================================= */
+  function pickOrderSource(c) {
+    const srcs = sourcesOf(c.id);
+    return srcs.find((s) => s.is_selected) || finalSourceOf(c).s || null;
+  }
+
+  function nextPoNumber() {
+    const d = new Date();
+    const prefix = `PO-${String(d.getFullYear() % 100).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-`;
+    const used = state.orders.map((o) => o.po_number).filter((n) => n && n.startsWith(prefix)).map((n) => +n.slice(prefix.length) || 0);
+    return prefix + String((used.length ? Math.max(...used) : 0) + 1).padStart(2, '0');
+  }
+
+  function orderTotals(d) {
+    const sub = (d.items || []).reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0);
+    const ship = Number(d.shipping) || 0;
+    return { sub, ship, total: sub + ship };
+  }
+  const moneyOf = (cur) => cur === 'CNY' ? (n) => '¥' + fmtNum(n, 2) : (n) => fmtNum(Math.round(n), 0) + '원';
+
+  function ordersHTML(c) {
+    const list = state.orders.filter((o) => o.candidate_id === c.id);
+    if (!list.length) return '';
+    return `
+      <div class="orders panel">
+        <div class="orders-head">🧾 발주서 <span>${list.length}건</span></div>
+        ${list.map((o) => {
+          const d = o.data || {};
+          const t = orderTotals(d);
+          return `<div class="order-row">
+            <b>${esc(o.po_number)}</b>
+            <span>${esc(d.supplier?.name || '')}</span>
+            <span class="num">${moneyOf(d.currency)(t.total)}</span>
+            <span class="muted">${o.created_by ? whoHTML(o.created_by, '· ' + ago(o.created_at)) : ago(o.created_at)}</span>
+            <span class="spacer"></span>
+            <button class="btn small ghost" data-act="edit-order" data-id="${o.id}">열기</button>
+            <button class="btn small" data-act="pdf-order" data-id="${o.id}">PDF</button>
+            <button class="btn small ghost danger" data-act="delete-order" data-id="${o.id}" aria-label="삭제">✕</button>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function openOrderForm(c, s, order) {
+    const co = state.settings.company || {};
+    const cur0 = s && s.cny_price != null ? 'CNY' : 'KRW';
+    const d = order ? JSON.parse(JSON.stringify(order.data || {})) : {
+      lang: ls.get('sb_po_lang', 'kozh'),
+      number: nextPoNumber(), date: today(), due: '',
+      currency: cur0,
+      supplier: { name: s ? (s.site + (s.product_name ? '' : '')) : '', contact: '', phone: '', url: s?.url || '' },
+      buyer: { name: co.name || '', contact: co.contact || me || '', phone: co.phone || '', address: co.address || '', biz: co.biz || '' },
+      ship_to: co.ship_to || co.address || '', payment: co.payment || '', shipping: 0, note: '',
+      items: [{ name: s?.product_name || c.title, option: '', qty: s?.moq || 1, price: s ? (cur0 === 'CNY' ? s.cny_price : (s.unit_price ?? '')) : '' }],
+      include_image: true
+    };
+    d.items = d.items && d.items.length ? d.items : [{ name: c.title, option: '', qty: 1, price: '' }];
+    const v = (x) => esc(x ?? '');
+    const itemRow = (it, i) => `
+      <tr data-row>
+        <td class="c">${i + 1}</td>
+        <td><input name="it_name" value="${v(it.name)}" placeholder="품명"></td>
+        <td><input name="it_option" value="${v(it.option)}" placeholder="색상 / 사이즈 / 규격"></td>
+        <td><input name="it_qty" inputmode="numeric" value="${v(it.qty)}" style="text-align:right"></td>
+        <td><input name="it_price" inputmode="decimal" value="${v(it.price)}" style="text-align:right"></td>
+        <td class="num" data-amount>-</td>
+        <td><button type="button" class="icon-btn" data-row-del aria-label="줄 삭제">✕</button></td>
+      </tr>`;
+
+    const form = openModal(`
+      <form novalidate>
+        <header class="modal-head">
+          <h2>🧾 ${order ? '발주서 수정' : '발주서 만들기'}</h2>
+          <button type="button" class="icon-btn" data-close aria-label="닫기">✕</button>
+        </header>
+        <div class="modal-body">
+          <div class="row4">
+            <label>발주번호 <input name="number" value="${v(d.number)}"></label>
+            <label>발주일 <input name="date" type="date" value="${v(d.date)}"></label>
+            <label>납기 요청일 <input name="due" type="date" value="${v(d.due)}"></label>
+            <label>표기 언어 <select name="lang">
+              <option value="ko" ${d.lang === 'ko' ? 'selected' : ''}>한국어</option>
+              <option value="kozh" ${d.lang !== 'ko' ? 'selected' : ''}>한국어 + 中文</option></select></label>
+          </div>
+          <fieldset class="po-fs"><legend>공급처 (거래처)</legend>
+            <div class="row2" style="grid-template-columns:1fr 1fr">
+              <label>상호 / 판매자 <input name="sup_name" value="${v(d.supplier?.name)}" placeholder="예: 1688 ○○공장"></label>
+              <label>담당자 <input name="sup_contact" value="${v(d.supplier?.contact)}"></label>
+              <label>연락처 / 위챗 <input name="sup_phone" value="${v(d.supplier?.phone)}"></label>
+              <label>상품 링크 <input name="sup_url" value="${v(d.supplier?.url)}"></label>
+            </div>
+          </fieldset>
+          <fieldset class="po-fs"><legend>발주처 (우리 회사)</legend>
+            <div class="row2" style="grid-template-columns:1fr 1fr">
+              <label>상호 <input name="buy_name" value="${v(d.buyer?.name)}"></label>
+              <label>담당자 <input name="buy_contact" value="${v(d.buyer?.contact)}"></label>
+              <label>연락처 <input name="buy_phone" value="${v(d.buyer?.phone)}"></label>
+              <label>사업자번호 <input name="buy_biz" value="${v(d.buyer?.biz)}"></label>
+            </div>
+            <label style="margin-top:10px">주소 <input name="buy_address" value="${v(d.buyer?.address)}"></label>
+            <label class="check" style="margin-top:8px"><input type="checkbox" name="save_company" ${order ? '' : 'checked'}> 우리 회사 정보·배송지·결제 조건을 다음에도 자동으로 채우기</label>
+          </fieldset>
+          <div>
+            <div class="section-head" style="margin:0 0 6px">
+              <h2 style="font-size:15px">품목</h2>
+              <label class="check" style="font-weight:600;font-size:13px">통화
+                <select name="currency" style="width:auto">
+                  <option value="CNY" ${d.currency === 'CNY' ? 'selected' : ''}>위안 (¥)</option>
+                  <option value="KRW" ${d.currency !== 'CNY' ? 'selected' : ''}>원 (₩)</option>
+                </select></label>
+            </div>
+            <div class="table-wrap">
+              <table class="cmp po-edit" style="min-width:680px">
+                <thead><tr><th style="width:36px">No</th><th>품명</th><th>옵션 · 규격</th><th style="width:90px">수량</th><th style="width:110px">단가</th><th class="num" style="width:120px">금액</th><th style="width:40px"></th></tr></thead>
+                <tbody id="po-items">${d.items.map(itemRow).join('')}</tbody>
+                <tfoot>
+                  <tr><td colspan="5" class="num">소계</td><td class="num" id="po-sub">-</td><td></td></tr>
+                  <tr><td colspan="5" class="num">배송비 <input name="shipping" inputmode="decimal" value="${v(d.shipping)}" style="width:110px;display:inline-block;text-align:right;margin-left:6px"></td><td class="num" id="po-ship">-</td><td></td></tr>
+                  <tr><td colspan="5" class="num"><b>합계</b></td><td class="num"><b id="po-total">-</b></td><td></td></tr>
+                </tfoot>
+              </table>
+            </div>
+            <button type="button" class="btn small" data-row-add style="margin-top:8px">+ 품목 추가</button>
+          </div>
+          <div class="row2" style="grid-template-columns:1fr 1fr">
+            <label>배송지 <input name="ship_to" value="${v(d.ship_to)}"></label>
+            <label>결제 조건 <input name="payment" value="${v(d.payment)}" placeholder="예: 선금 30%, 출고 전 잔금"></label>
+          </div>
+          <label>비고 <textarea name="note" rows="3" placeholder="포장, 라벨, 검수 요청 사항 등">${v(d.note)}</textarea></label>
+          ${s && (s.images || []).length ? `<label class="check"><input type="checkbox" name="include_image" ${d.include_image !== false ? 'checked' : ''}> 소싱처 상품 이미지 넣기</label>` : ''}
+        </div>
+        <footer class="modal-foot">
+          <span class="muted" style="font-size:13px">${s ? `기준 소싱처: ${esc(s.site)}` : '소싱처 없이 작성'}</span>
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close>취소</button>
+          <button type="submit" class="btn">저장</button>
+          <button type="submit" class="btn primary" data-pdf="1">저장 후 PDF</button>
+        </footer>
+      </form>`,
+    async (f, _images, frm, submitter) => {
+      const items = $$('#po-items tr[data-row]', frm).map((tr) => ({
+        name: tr.querySelector('[name=it_name]').value.trim(),
+        option: tr.querySelector('[name=it_option]').value.trim(),
+        qty: decOrNull(tr.querySelector('[name=it_qty]').value) ?? 0,
+        price: decOrNull(tr.querySelector('[name=it_price]').value) ?? 0
+      })).filter((it) => it.name || it.qty || it.price);
+      if (!items.length) throw new Error('품목을 1개 이상 입력해 주세요.');
+      const data = {
+        lang: f.lang, number: f.number.trim() || nextPoNumber(), date: f.date, due: f.due, currency: f.currency,
+        supplier: { name: f.sup_name.trim(), contact: f.sup_contact.trim(), phone: f.sup_phone.trim(), url: normUrl(f.sup_url) || '' },
+        buyer: { name: f.buy_name.trim(), contact: f.buy_contact.trim(), phone: f.buy_phone.trim(), address: f.buy_address.trim(), biz: f.buy_biz.trim() },
+        ship_to: f.ship_to.trim(), payment: f.payment.trim(), shipping: decOrNull(f.shipping) ?? 0, note: f.note || '',
+        items, include_image: f.include_image === 'on'
+      };
+      ls.set('sb_po_lang', data.lang);
+      let saved;
+      if (order) {
+        const { data: r, error } = await sb.from('orders').update({ po_number: data.number, data, ...stampUpd() }).eq('id', order.id).select().single();
+        if (error) throw error;
+        saved = r;
+      } else {
+        const { data: r, error } = await sb.from('orders').insert({ candidate_id: c.id, source_id: s?.id || null, po_number: data.number, data, ...stampNew() }).select().single();
+        if (error) throw error;
+        saved = r;
+      }
+      if (f.save_company === 'on') {
+        try { await saveSetting('company', { ...data.buyer, ship_to: data.ship_to, payment: data.payment }); } catch (err) { console.warn(err); }
+      }
+      await loadAll();
+      toast(`발주서 ${data.number}을(를) 저장했습니다.`);
+      state.tab = 'sources'; ls.set('sb_tab', 'sources');
+      await route(false);
+      if (submitter?.dataset.pdf) exportOrderPDF(state.orders.find((o) => o.id === saved.id) || saved);
+    });
+
+    modal.classList.add('wide');
+    modal.addEventListener('close', () => modal.classList.remove('wide'), { once: true });
+    const tbody = form.querySelector('#po-items');
+    const recalc = () => {
+      const money = moneyOf(form.currency.value);
+      let sub = 0;
+      $$('tr[data-row]', tbody).forEach((tr, i) => {
+        tr.querySelector('td').textContent = i + 1;
+        const amt = (decOrNull(tr.querySelector('[name=it_qty]').value) || 0) * (decOrNull(tr.querySelector('[name=it_price]').value) || 0);
+        sub += amt;
+        tr.querySelector('[data-amount]').textContent = amt ? money(amt) : '-';
+      });
+      const ship = decOrNull(form.shipping.value) || 0;
+      form.querySelector('#po-sub').textContent = money(sub);
+      form.querySelector('#po-ship').textContent = money(ship);
+      form.querySelector('#po-total').textContent = money(sub + ship);
+    };
+    form.addEventListener('input', recalc);
+    form.currency.addEventListener('change', () => {
+      // 통화를 바꾸면 소싱처 가격으로 단가를 다시 채워줌 (첫 줄)
+      const first = tbody.querySelector('[name=it_price]');
+      if (s && first) first.value = form.currency.value === 'CNY' ? (s.cny_price ?? first.value) : (s.unit_price ?? first.value);
+      recalc();
+    });
+    form.querySelector('[data-row-add]').addEventListener('click', () => {
+      tbody.insertAdjacentHTML('beforeend', itemRow({ name: '', option: '', qty: 1, price: '' }, tbody.children.length));
+      tbody.lastElementChild.querySelector('input').focus();
+      recalc();
+    });
+    tbody.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-row-del]')) return;
+      if (tbody.children.length <= 1) { toast('품목은 1개 이상 있어야 합니다.'); return; }
+      e.target.closest('tr').remove();
+      recalc();
+    });
+    recalc();
+  }
+
+  async function exportOrderPDF(o) {
+    const d = o.data || {};
+    const c = state.candidates.find((x) => x.id === o.candidate_id);
+    const s = state.sources.find((x) => x.id === o.source_id);
+    const zh = d.lang !== 'ko';
+    const L = (ko, cn) => zh ? `${ko}<span class="zh">${cn}</span>` : ko;
+    const money = moneyOf(d.currency);
+    const t = orderTotals(d);
+    const imgPath = d.include_image && s?.images?.[0];
+    if (imgPath) await ensureUrls([imgPath]);
+    const kv = (k, val) => `<tr><th>${k}</th><td>${val ? esc(val) : ''}</td></tr>`;
+    const html = `
+      <div class="po-top">
+        <h1>${zh ? '발주서<span class="zh">采 购 单</span>' : '발 주 서'}</h1>
+        <table class="po-meta">
+          <tr><th>${L('발주번호', '订单号')}</th><td>${esc(d.number || o.po_number)}</td></tr>
+          <tr><th>${L('발주일', '下单日期')}</th><td>${esc(d.date || '')}</td></tr>
+          <tr><th>${L('납기 요청일', '交货日期')}</th><td>${esc(d.due || '')}</td></tr>
+        </table>
+      </div>
+      <div class="po-parties pdf-avoid">
+        <div><h3>${L('공급처', '供应商')}</h3><table>
+          ${kv(L('상호', '公司名称'), d.supplier?.name)}${kv(L('담당자', '联系人'), d.supplier?.contact)}
+          ${kv(L('연락처', '电话/微信'), d.supplier?.phone)}
+          <tr><th>${L('링크', '链接')}</th><td style="word-break:break-all">${d.supplier?.url ? esc(d.supplier.url) : ''}</td></tr>
+        </table></div>
+        <div><h3>${L('발주처', '采购方')}</h3><table>
+          ${kv(L('상호', '公司名称'), d.buyer?.name)}${kv(L('담당자', '联系人'), d.buyer?.contact)}
+          ${kv(L('연락처', '电话'), d.buyer?.phone)}${kv(L('사업자번호', '营业执照号'), d.buyer?.biz)}
+          ${kv(L('주소', '地址'), d.buyer?.address)}
+        </table></div>
+      </div>
+      <table class="po-items">
+        <thead><tr>
+          <th style="width:34px">No</th><th>${L('품명', '品名')}</th><th>${L('옵션 · 규격', '规格')}</th>
+          <th style="width:70px">${L('수량', '数量')}</th><th style="width:100px">${L('단가', '单价')}</th><th style="width:116px">${L('금액', '金额')}</th>
+        </tr></thead>
+        <tbody>
+          ${(d.items || []).map((it, i) => `<tr>
+            <td class="c">${i + 1}</td><td>${esc(it.name)}</td><td>${esc(it.option || '')}</td>
+            <td class="num">${fmtNum(it.qty || 0, 2)}</td><td class="num">${money(it.price || 0)}</td><td class="num">${money((it.qty || 0) * (it.price || 0))}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr><td colspan="5" class="num">${L('소계', '小计')}</td><td class="num">${money(t.sub)}</td></tr>
+          <tr><td colspan="5" class="num">${L('배송비', '运费')}</td><td class="num">${money(t.ship)}</td></tr>
+          <tr class="grand"><td colspan="5" class="num">${L('합계', '合计')}</td><td class="num">${money(t.total)}</td></tr>
+        </tfoot>
+      </table>
+      ${imgPath ? `<div class="po-img pdf-avoid"><img src="${esc(imgUrl(imgPath))}"><div class="pdf-note">${L('상품 참고 이미지', '产品参考图片')}${c ? '<br>' + esc(c.title) : ''}</div></div>` : ''}
+      <table class="po-terms pdf-avoid">
+        <tr><th>${L('배송지', '收货地址')}</th><td>${esc(d.ship_to || '')}</td></tr>
+        <tr><th>${L('결제 조건', '付款方式')}</th><td>${esc(d.payment || '')}</td></tr>
+        <tr><th>${L('비고', '备注')}</th><td>${nl2br(d.note || '')}</td></tr>
+      </table>
+      <div class="po-sign pdf-avoid">
+        <div>${L('발주처 확인', '采购方确认')}<br>${esc(d.buyer?.name || '')}<span class="stamp">(${zh ? '인 / 盖章' : '인'})</span></div>
+        <div>${L('공급처 확인', '供应商确认')}<br>${esc(d.supplier?.name || '')}<span class="stamp">(${zh ? '인 / 盖章' : '인'})</span></div>
+      </div>
+      <p class="pdf-note" style="margin-top:10px">${o.created_by ? esc(o.created_by) + ' 작성' : ''}${o.updated_by && o.updated_by !== o.created_by ? ' · ' + esc(o.updated_by) + ' 수정' : ''}</p>`;
+    await exportPDF(html, `${d.number || o.po_number}_발주서`);
+  }
 })();
 
   </script>
