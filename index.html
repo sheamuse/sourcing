@@ -1081,11 +1081,13 @@ window.APP_CONFIG = {
 
   const sourcesOf = (id) => state.sources.filter((s) => s.candidate_id === id);
   const coverOf = (c) => (c.images && c.images[0]) || sourcesOf(c.id).flatMap((s) => s.images || [])[0] || null;
+  // 도착원가: 위안가에 계산법을 적용한 값. 위안가가 없는 국내 소싱처는 현지원가(단가+배송비)를 그대로 씀
+  const arrivalCost = (s) => s.final_price != null ? s.final_price : totalCost(s);
   const bestCostOf = (id) => {
     const srcs = sourcesOf(id);
     const chosen = srcs.find((s) => s.is_selected);
-    if (chosen && totalCost(chosen) != null) return { cost: totalCost(chosen), chosen: true };
-    const costs = srcs.map(totalCost).filter((v) => v != null);
+    if (chosen && arrivalCost(chosen) != null) return { cost: arrivalCost(chosen), chosen: true };
+    const costs = srcs.map(arrivalCost).filter((v) => v != null);
     return costs.length ? { cost: Math.min(...costs), chosen: false } : null;
   };
   const docPaths = (html) => [...String(html || '').matchAll(/data-path="([^"]+)"/g)].map((m) => m[1]);
@@ -1996,7 +1998,7 @@ window.APP_CONFIG = {
     const p = presetById(calcSel);
     const cny = decOrNull(calcCny);
     if (cny == null) {
-      out.innerHTML = `<div class="calc-sub">위안화 금액을 넣으면 선택한 계산법으로 최종금액을 계산합니다.</div><div class="calc-expr">${esc(p.formula)}</div>`;
+      out.innerHTML = `<div class="calc-sub">위안화 금액을 넣으면 선택한 계산법으로 도착원가를 계산합니다.</div><div class="calc-expr">${esc(p.formula)}</div>`;
       others.innerHTML = '';
       return;
     }
@@ -2127,7 +2129,7 @@ window.APP_CONFIG = {
         return;
       }
       st.mode = 'live';
-      if (cny == null) { st.result = null; out.textContent = '-'; explain.textContent = '위안화 가격을 넣으면 계산 과정과 최종금액이 여기에 나옵니다.'; return; }
+      if (cny == null) { st.result = null; out.textContent = '-'; explain.textContent = '위안화 가격을 넣으면 계산 과정과 결과가 여기에 나옵니다.'; return; }
       try {
         const r = calcPrice(cny, preset());
         st.result = r;
@@ -2329,7 +2331,7 @@ window.APP_CONFIG = {
           <p class="excerpt">${esc(excerpt)}</p>
           <div class="card-foot">
             <span>${c.created_by ? whoHTML(c.created_by, '· ' + ago(c.created_at)) : '소싱처 ' + n + '곳'}</span>
-            ${best ? `<span>${best.chosen ? '선택 원가' : '최저 원가'} <strong>${won(best.cost)}</strong></span>` : n ? `<span>소싱처 ${n}곳</span>` : ''}
+            ${best ? `<span>${best.chosen ? '선택 도착원가' : '최저 도착원가'} <strong>${won(best.cost)}</strong></span>` : n ? `<span>소싱처 ${n}곳</span>` : ''}
           </div>
         </div>
       </a>`;
@@ -2438,7 +2440,7 @@ window.APP_CONFIG = {
         <section class="panel">
           <div class="facts">
             <div><span>목표 판매가</span><strong id="info-target">${won(c.target_price)}</strong></div>
-            <div><span>${best?.chosen ? '선택한 소싱처 원가' : '최저 원가'}</span><strong>${best ? won(best.cost) : '-'}</strong>${srcs.length ? `<span class="calc-note">소싱처 ${srcs.length}곳</span>` : ''}</div>
+            <div><span>${best?.chosen ? '선택 소싱처 도착원가' : '최저 도착원가'}</span><strong>${best ? won(best.cost) : '-'}</strong>${srcs.length ? `<span class="calc-note">소싱처 ${srcs.length}곳</span>` : ''}</div>
             <div><span>예상 마진율</span><strong class="${m == null ? '' : m >= 30 ? 'good' : m < 10 ? 'bad' : ''}">${m == null ? '-' : m + '%'}</strong></div>
           </div>
           <article class="note"><h2>판매가 계산</h2>
@@ -2500,12 +2502,12 @@ window.APP_CONFIG = {
   }
 
   async function renderSourcesTab(c, body) {
-    const srcs = sourcesOf(c.id).map((s) => ({ ...s, total: totalCost(s) }));
+    const srcs = sourcesOf(c.id).map((s) => ({ ...s, total: totalCost(s), arrival: arrivalCost(s) }));
     await ensureUrls(srcs.flatMap((s) => s.images || []));
-    const costs = srcs.map((s) => s.total).filter((v) => v != null);
+    const costs = srcs.map((s) => s.arrival).filter((v) => v != null);
     const minCost = costs.length ? Math.min(...costs) : null;
     const maxCost = costs.length ? Math.max(...costs) : null;
-    const sorted = [...srcs].sort((a, b) => (b.is_selected - a.is_selected) || ((a.total ?? Infinity) - (b.total ?? Infinity)));
+    const sorted = [...srcs].sort((a, b) => (b.is_selected - a.is_selected) || ((a.arrival ?? Infinity) - (b.arrival ?? Infinity)));
     const para = (txt, ph) => txt ? nl2br(txt) : `<span class="placeholder">${ph}</span>`;
 
     body.innerHTML = `
@@ -2522,14 +2524,14 @@ window.APP_CONFIG = {
           <div class="table-wrap">
             <table class="cmp">
               <thead><tr>
-                <th>사이트</th><th>상품</th><th class="num">위안가</th><th class="num">최종금액</th>
-                <th>총 원가</th><th class="num">마진율</th><th class="num">MOQ</th><th class="num">배송</th><th>등록</th><th></th>
+                <th>사이트</th><th>상품</th><th class="num">위안가</th><th class="num">현지원가</th>
+                <th>도착원가</th><th class="num">마진율</th><th class="num">MOQ</th><th class="num">배송</th><th>등록</th><th></th>
               </tr></thead>
               <tbody>
                 ${sorted.map((s) => {
-                  const isBest = s.total != null && s.total === minCost && costs.length > 1;
-                  const mm = marginPct(c.target_price, s.total);
-                  const pct = s.total != null && maxCost ? Math.max(4, (s.total / maxCost) * 100) : 0;
+                  const isBest = s.arrival != null && s.arrival === minCost && costs.length > 1;
+                  const mm = marginPct(c.target_price, s.arrival);
+                  const pct = s.arrival != null && maxCost ? Math.max(4, (s.arrival / maxCost) * 100) : 0;
                   const thumb = s.images?.[0];
                   return `
                   <tr class="${s.is_selected ? 'selected' : ''} ${isBest ? 'best' : ''}">
@@ -2547,10 +2549,10 @@ window.APP_CONFIG = {
                       </div>
                     </td>
                     <td class="num">${yuan(s.cny_price)}</td>
-                    <td class="num" title="${esc(s.applied_text || '')}"><b>${won(s.final_price)}</b></td>
-                    <td class="cost">
-                      <div class="cost-val">${won(s.total)}</div>
-                      ${s.total != null ? `<div class="cost-bar"><i style="width:${pct}%"></i></div>` : ''}
+                    <td class="num">${won(s.total)}</td>
+                    <td class="cost" title="${esc(s.applied_text || '')}">
+                      <div class="cost-val">${won(s.arrival)}</div>
+                      ${s.arrival != null ? `<div class="cost-bar"><i style="width:${pct}%"></i></div>` : ''}
                     </td>
                     <td class="num"><span class="margin ${mm == null ? '' : mm >= 30 ? 'good' : mm < 10 ? 'bad' : ''}">${mm == null ? '-' : mm + '%'}</span></td>
                     <td class="num">${s.moq ? s.moq.toLocaleString('ko-KR') + '개' : '-'}</td>
@@ -2567,7 +2569,7 @@ window.APP_CONFIG = {
               </tbody>
             </table>
           </div>
-          <p class="hint">최종금액 = 위안가에 저장된 계산법을 적용한 값 (마우스를 올리면 계산 과정). 총 원가 = 단가 + 배송비, 마진율은 목표 판매가 기준입니다.</p>
+          <p class="hint">현지원가 = 단가 + 배송비. 도착원가 = 위안가에 계산법을 적용한 값 (마우스를 올리면 계산 과정, 위안가가 없으면 현지원가). 마진율 = (목표 판매가 − 도착원가) ÷ 목표 판매가.</p>
 
           <div class="src-cards">
             ${sorted.map((s) => `
@@ -2582,7 +2584,7 @@ window.APP_CONFIG = {
                 ${s.cny_price != null || s.final_price != null ? `
                   <div class="src-price" title="${esc(s.applied_text || '')}">
                     <div><span>원가</span><b>${yuan(s.cny_price)}</b></div>
-                    <div><span>최종금액</span><b>${won(s.final_price)}</b></div>
+                    <div><span>도착원가</span><b>${won(s.final_price)}</b></div>
                   </div>` : ''}
                 ${(s.pros || s.cons) ? `
                   <div class="pc">
@@ -3149,7 +3151,7 @@ window.APP_CONFIG = {
             <label>사이트 <input name="site" list="site-list" value="${v('site')}" required placeholder="예: 1688">
               <datalist id="site-list">${SITES.map((x) => `<option value="${x}">`).join('')}</datalist></label>
           </div>
-          ${priceBoxHTML(s, '최종금액')}
+          ${priceBoxHTML(s, '도착원가')}
           <div class="row4">
             <label>단가 <small>원 · 위안×환율 자동</small><input name="unit_price" inputmode="numeric" value="${s?.unit_price ?? ''}" placeholder="2400"></label>
             <label>배송비 <small>개당 원</small><input name="shipping_fee" inputmode="numeric" value="${s?.shipping_fee ?? ''}" placeholder="1200"></label>
@@ -3572,8 +3574,8 @@ window.APP_CONFIG = {
     const srcs = sourcesOf(c.id);
     const chosen = srcs.find((s) => s.is_selected);
     if (chosen) return { s: chosen, note: '' };
-    const withCost = srcs.filter((s) => totalCost(s) != null).sort((a, b) => totalCost(a) - totalCost(b));
-    if (withCost.length) return { s: withCost[0], note: '최종 선택된 소싱처가 없어 총 원가가 가장 낮은 소싱처를 표시합니다.' };
+    const withCost = srcs.filter((s) => arrivalCost(s) != null).sort((a, b) => arrivalCost(a) - arrivalCost(b));
+    if (withCost.length) return { s: withCost[0], note: '최종 선택된 소싱처가 없어 도착원가가 가장 낮은 소싱처를 표시합니다.' };
     if (srcs.length) return { s: srcs[0], note: '최종 선택된 소싱처가 없어 첫 번째 소싱처를 표시합니다.' };
     return { s: null, note: '등록된 소싱처가 없습니다.' };
   }
@@ -3595,7 +3597,7 @@ window.APP_CONFIG = {
         ${c.created_by ? `<br>${esc(c.created_by)} 등록 (${fmtDate(c.created_at)})` : ''}${c.updated_by ? ` · ${esc(c.updated_by)} 최종 수정 (${fmtDate(c.updated_at)})` : ''}</div>
       <div class="pdf-facts pdf-avoid">
         <div><span>목표 판매가</span><b>${won(c.target_price)}</b></div>
-        <div><span>${best?.chosen ? '최종 소싱처 원가' : '최저 원가'}</span><b>${best ? won(best.cost) : '-'}</b></div>
+        <div><span>${best?.chosen ? '최종 소싱처 도착원가' : '최저 도착원가'}</span><b>${best ? won(best.cost) : '-'}</b></div>
         <div><span>예상 마진율</span><b>${m == null ? '-' : m + '%'}</b></div>
       </div>
       ${c.applied_text ? `<div class="pdf-note">판매가 계산: ${esc(c.applied_text)}</div>` : ''}
@@ -3612,9 +3614,9 @@ window.APP_CONFIG = {
           ${row('상품명', esc(fin.product_name || ''))}
           ${row('링크', fin.url ? `<a href="${esc(fin.url)}">${esc(fin.url)}</a>` : '')}
           ${row('위안가', fin.cny_price != null ? yuan(fin.cny_price) : '')}
-          ${row('최종금액', fin.final_price != null ? `<b>${won(fin.final_price)}</b>${fin.applied_text ? `<div class="pdf-note">${esc(fin.applied_text)}</div>` : ''}` : '')}
+          ${row('도착원가', fin.final_price != null ? `<b>${won(fin.final_price)}</b>${fin.applied_text ? `<div class="pdf-note">${esc(fin.applied_text)}</div>` : ''}` : '')}
           ${row('단가 / 배송비', `${won(fin.unit_price)} / ${won(fin.shipping_fee)}`)}
-          ${row('총 원가', won(totalCost(fin)))}
+          ${row('현지원가', won(totalCost(fin)))}
           ${row('MOQ', fin.moq ? fin.moq.toLocaleString('ko-KR') + '개' : '')}
           ${row('배송 기간', fin.lead_days ? fin.lead_days + '일' : '')}
           ${row('평점 · 후기', esc(fin.rating || ''))}
@@ -3627,10 +3629,10 @@ window.APP_CONFIG = {
       ${srcs.length > 1 ? `
         <h2>소싱처 비교 (${srcs.length}곳)</h2>
         <table class="pdf-cmp">
-          <thead><tr><th>사이트</th><th>상품명</th><th class="num">위안가</th><th class="num">최종금액</th><th class="num">총 원가</th><th class="num">MOQ</th><th class="num">배송</th></tr></thead>
-          <tbody>${[...srcs].sort((a, b) => (totalCost(a) ?? 1e15) - (totalCost(b) ?? 1e15)).map((s) => `
+          <thead><tr><th>사이트</th><th>상품명</th><th class="num">위안가</th><th class="num">현지원가</th><th class="num">도착원가</th><th class="num">마진율</th><th class="num">MOQ</th><th class="num">배송</th></tr></thead>
+          <tbody>${[...srcs].sort((a, b) => (arrivalCost(a) ?? 1e15) - (arrivalCost(b) ?? 1e15)).map((s) => `
             <tr class="${fin && s.id === fin.id ? 'sel' : ''}"><td>${esc(s.site)}${s.is_selected ? ' ✓' : ''}</td><td>${esc(s.product_name || '')}</td>
-            <td class="num">${yuan(s.cny_price)}</td><td class="num">${won(s.final_price)}</td><td class="num">${won(totalCost(s))}</td>
+            <td class="num">${yuan(s.cny_price)}</td><td class="num">${won(totalCost(s))}</td><td class="num">${won(arrivalCost(s))}</td><td class="num">${(() => { const mm = marginPct(c.target_price, arrivalCost(s)); return mm == null ? '-' : mm + '%'; })()}</td>
             <td class="num">${s.moq ? s.moq + '개' : '-'}</td><td class="num">${s.lead_days ? s.lead_days + '일' : '-'}</td></tr>`).join('')}
           </tbody>
         </table>` : ''}`;
