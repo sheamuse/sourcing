@@ -665,6 +665,43 @@ body { overflow-wrap: anywhere; }
 .tp-custom input { width: 64px; padding: 5px 7px; }
 .table-picker .tp-custom .btn { width: auto; }
 .tp-head { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; }
+
+/* ===== 경쟁사 비교 ===== */
+.vs { padding: 18px 20px; margin-bottom: 16px; }
+.vs-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 20px; }
+@media (max-width: 760px) { .vs-grid { grid-template-columns: 1fr; } }
+.vs-col h3 { margin: 0 0 10px; font-size: 14px; }
+.vs-col h3 small { font-weight: 500; color: var(--muted); font-size: 12px; margin-left: 4px; }
+.vs-col dl { margin: 0; display: grid; gap: 8px; }
+.vs-col dl > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); }
+.vs-col.ours dl > div { background: var(--accent-soft); border-color: transparent; }
+.vs-col dt { font-size: 12.5px; color: var(--muted); min-width: 92px; }
+.vs-col dd { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.vs-col dd.good, .vs-sub b.good { color: var(--picked); }
+.vs-col dd.bad, .vs-sub b.bad { color: var(--drop); }
+.vs-sub { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+.vs-col .btn.small { height: 26px; font-size: 12px; }
+.vs-verdict { margin: 14px 0 0; font-size: 14.5px; }
+.vs-verdict b.down, .diff.good { color: var(--picked); }
+.vs-verdict b.up, .diff.bad { color: var(--drop); }
+.diff { font-weight: 600; font-size: 13px; white-space: nowrap; }
+.diff small { margin-left: 4px; font-weight: 500; opacity: .8; }
+.seller { font-size: 12.5px; color: var(--muted); }
+.pricemap { margin-top: 18px; }
+.pm-track { position: relative; height: 54px; margin: 0 6px; }
+.pm-track::before { content: ""; position: absolute; left: 0; right: 0; top: 26px; height: 4px; border-radius: 2px; background: var(--line); }
+.pm-band { position: absolute; top: 24px; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 30%, transparent); }
+.pm-dot { position: absolute; top: 22px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--surface); border: 2.5px solid var(--muted); }
+.pm-mark { position: absolute; top: 0; bottom: 0; }
+.pm-mark i { position: absolute; left: -1.5px; top: 14px; width: 3px; height: 28px; border-radius: 2px; }
+.pm-mark b { position: absolute; top: -4px; transform: translateX(-50%); font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pm-mark.ours i { background: var(--accent); } .pm-mark.ours b { color: var(--accent); }
+.pm-mark.cost i { background: var(--picked); } .pm-mark.cost b { color: var(--picked); top: 42px; }
+.pm-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+.pm-legend i { display: inline-block; vertical-align: -1px; margin-right: 5px; }
+.lg-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--muted); }
+.lg-ours { width: 3px; height: 12px; background: var(--accent); }
+.lg-cost { width: 3px; height: 12px; background: var(--picked); }
 </style>
 </head>
 <body>
@@ -763,6 +800,13 @@ window.APP_CONFIG = {
   const STATUS_KEY = { '검토중': 'review', '선정': 'picked', '보류': 'hold', '탈락': 'drop' };
   const PRIORITIES = ['높음', '보통', '낮음'];
   const SITES = ['1688', '타오바오', '알리익스프레스', '테무', '쿠팡', '네이버 스마트스토어', '도매꾹', '도매매', '오너클랜', '아마존', '기타'];
+  const COMP_PLATFORMS = ['쿠팡', '네이버 스마트스토어', '11번가', 'G마켓', '옥션', '무신사', '29CM', '오늘의집', '지그재그', '에이블리', '카카오 선물하기', 'SSG', '자사몰', '기타'];
+  const COMP_HOSTS = [
+    [/coupang\.com/, '쿠팡'], [/smartstore\.naver|shopping\.naver|brand\.naver/, '네이버 스마트스토어'], [/11st\.co\.kr/, '11번가'],
+    [/gmarket\.co\.kr/, 'G마켓'], [/auction\.co\.kr/, '옥션'], [/musinsa\.com/, '무신사'], [/29cm\.co\.kr/, '29CM'],
+    [/ohou\.se/, '오늘의집'], [/zigzag\.kr/, '지그재그'], [/a-bly\.com/, '에이블리'], [/gift\.kakao\.com/, '카카오 선물하기'], [/ssg\.com/, 'SSG']
+  ];
+  const guessPlatform = (url) => { const h = hostOf(url || ''); const hit = COMP_HOSTS.find(([re]) => re.test(h)); return hit ? hit[1] : ''; };
   const SITE_HOSTS = [
     [/1688\.com/, '1688'], [/taobao\.com|tmall\.com/, '타오바오'], [/aliexpress\./, '알리익스프레스'],
     [/temu\.com/, '테무'], [/coupang\.com/, '쿠팡'], [/smartstore\.naver|shopping\.naver|brand\.naver/, '네이버 스마트스토어'],
@@ -853,7 +897,7 @@ window.APP_CONFIG = {
 
   const state = {
     candidates: [], sources: [], folders: [],
-    settings: { calc: normalizeCalc(null), members: [], company: {} }, settingsMeta: {}, orders: [],
+    settings: { calc: normalizeCalc(null), members: [], company: {} }, settingsMeta: {}, orders: [], competitors: [],
     status: 'all', q: '', category: '', author: '', sort: 'new',
     tab: ls.get('sb_tab', 'info'),
     expanded: new Set(ls.get('sb_expanded', []))
@@ -1089,16 +1133,17 @@ window.APP_CONFIG = {
      데이터
      ========================================================= */
   async function loadAll() {
-    const [c, s, f, st, od] = await Promise.all([
+    const [c, s, f, st, od, cp] = await Promise.all([
       sb.from('candidates').select('*').order('created_at', { ascending: false }),
       sb.from('sources').select('*').order('created_at', { ascending: true }),
       sb.from('folders').select('*'),
       sb.from('settings').select('*'),
-      sb.from('orders').select('*').order('created_at', { ascending: false })
+      sb.from('orders').select('*').order('created_at', { ascending: false }),
+      sb.from('competitors').select('*').order('created_at', { ascending: true })
     ]);
-    const err = c.error || s.error || f.error || st.error || od.error;
+    const err = c.error || s.error || f.error || st.error || od.error || cp.error;
     if (err) {
-      const needMigrate = /folders|settings|orders|kind|column|does not exist|schema cache|relation/i.test(err.message);
+      const needMigrate = /folders|settings|orders|competitors|kind|column|does not exist|schema cache|relation/i.test(err.message);
       view.innerHTML = `<div class="empty"><h2>${needMigrate ? '데이터베이스 업데이트가 필요합니다' : '데이터를 불러오지 못했습니다'}</h2>
         <p>${needMigrate ? 'Supabase → SQL Editor에서 새 supabase-schema.sql 내용을 붙여넣고 Run 해주세요. 기존 데이터는 그대로 유지됩니다.' : esc(err.message)}</p>
         <button class="btn" onclick="location.reload()">다시 시도</button></div>`;
@@ -1108,6 +1153,7 @@ window.APP_CONFIG = {
     state.sources = s.data || [];
     state.folders = f.data || [];
     state.orders = od.data || [];
+    state.competitors = cp.data || [];
     (st.data || []).forEach((r) => {
       state.settings[r.key] = r.value;
       state.settingsMeta[r.key] = { by: r.updated_by, at: r.updated_at };
@@ -1126,6 +1172,8 @@ window.APP_CONFIG = {
   }
 
   const sourcesOf = (id) => state.sources.filter((s) => s.candidate_id === id);
+  const competitorsOf = (id) => state.competitors.filter((x) => x.candidate_id === id);
+  const compTotal = (x) => x.price == null ? null : (x.price || 0) + (x.shipping_fee || 0);
   const coverOf = (c) => (c.images && c.images[0]) || sourcesOf(c.id).flatMap((s) => s.images || [])[0] || null;
   // 도착원가: 위안가에 계산법을 적용한 값. 위안가가 없는 국내 소싱처는 현지원가(단가+배송비)를 그대로 씀
   const arrivalCost = (s) => s.final_price != null ? s.final_price : totalCost(s);
@@ -1798,7 +1846,7 @@ window.APP_CONFIG = {
     const { error } = await sb.from('candidates').delete().eq('id', c.id);
     if (error) { toast('삭제하지 못했습니다: ' + error.message, true); return; }
     if (docCtx && docCtx.id === c.id) docCtx = null;
-    await removeFiles([...(c.images || []), ...srcs.flatMap((s) => s.images || []), ...docPaths(c.doc_html)]);
+    await removeFiles([...(c.images || []), ...srcs.flatMap((s) => s.images || []), ...competitorsOf(c.id).flatMap((x) => x.images || []), ...docPaths(c.doc_html)]);
     await loadAll();
     renderTree();
     toast('삭제했습니다.');
@@ -2404,8 +2452,9 @@ window.APP_CONFIG = {
       return;
     }
     if (c.kind === 'doc') { await renderDocOnly(c); return; }
-    if (!['doc', 'info', 'sources'].includes(state.tab)) state.tab = 'info';
+    if (!['doc', 'info', 'sources', 'comp'].includes(state.tab)) state.tab = 'info';
     const srcCount = sourcesOf(id).length;
+    const compCount = competitorsOf(id).length;
     const path = c.folder_id ? folderPath(c.folder_id) : [];
     const edited = c.updated_by && (c.updated_by !== c.created_by || (new Date(c.updated_at) - new Date(c.created_at)) > 60000);
 
@@ -2436,6 +2485,7 @@ window.APP_CONFIG = {
       <div class="dtabs" role="tablist">
         <button role="tab" data-act="tab" data-v="info" aria-selected="${state.tab === 'info'}">요약 · 이미지</button>
         <button role="tab" data-act="tab" data-v="sources" aria-selected="${state.tab === 'sources'}">소싱처 비교<span class="n">${srcCount}</span></button>
+        <button role="tab" data-act="tab" data-v="comp" aria-selected="${state.tab === 'comp'}">경쟁사 비교<span class="n">${compCount}</span></button>
         <button role="tab" data-act="tab" data-v="doc" aria-selected="${state.tab === 'doc'}">📝 문서</button>
       </div>
       <div id="tabbody"></div>`;
@@ -2443,6 +2493,7 @@ window.APP_CONFIG = {
     const body = $('#tabbody');
     if (state.tab === 'doc') await renderDocTab(c, body);
     else if (state.tab === 'info') await renderInfoTab(c, body);
+    else if (state.tab === 'comp') await renderCompetitorsTab(c, body);
     else await renderSourcesTab(c, body);
   }
 
@@ -3576,6 +3627,234 @@ window.APP_CONFIG = {
   }
 
   /* =========================================================
+     경쟁사 비교
+     ========================================================= */
+  function diffLabel(theirs, ours) {
+    if (theirs == null || ours == null) return '-';
+    const d = theirs - ours;
+    if (Math.abs(d) < 1) return '<span class="muted">같음</span>';
+    const pct = Math.round((Math.abs(d) / ours) * 1000) / 10;
+    // 경쟁사가 더 비싸면 우리에게 유리(초록), 더 싸면 불리(빨강)
+    return d > 0
+      ? `<span class="diff good">우리보다 ${won(d)} 비쌈<small>+${pct}%</small></span>`
+      : `<span class="diff bad">우리보다 ${won(-d)} 쌈<small>−${pct}%</small></span>`;
+  }
+
+  async function renderCompetitorsTab(c, body) {
+    const list = competitorsOf(c.id).map((x) => ({ ...x, total: compTotal(x) }));
+    await ensureUrls([...list.flatMap((x) => x.images || []), ...(c.images || []).slice(0, 1)]);
+    const prices = list.map((x) => x.total).filter((v) => v != null);
+    const min = prices.length ? Math.min(...prices) : null;
+    const max = prices.length ? Math.max(...prices) : null;
+    const avg = prices.length ? Math.round(prices.reduce((s, v) => s + v, 0) / prices.length) : null;
+    const ours = c.target_price ?? null;
+    const best = bestCostOf(c.id);
+    const cost = best ? best.cost : null;
+    const m = (price) => { const v = marginPct(price, cost); return v == null ? '-' : v + '%'; };
+    const mCls = (price) => { const v = marginPct(price, cost); return v == null ? '' : v >= 30 ? 'good' : v < 10 ? 'bad' : ''; };
+    const sorted = [...list].sort((a, b) => (a.total ?? Infinity) - (b.total ?? Infinity));
+    const para = (txt) => txt ? nl2br(txt) : '<span class="placeholder">-</span>';
+
+    // 가격 분포 막대 (경쟁사 점 + 우리 판매가·도착원가 표시)
+    const pts = [...prices, ours, cost].filter((v) => v != null);
+    const lo = pts.length ? Math.min(...pts) : 0, hi = pts.length ? Math.max(...pts) : 1;
+    const pad = (hi - lo) * 0.08 || hi * 0.1 || 1;
+    const L = lo - pad, R = hi + pad;
+    const pos = (v) => ((v - L) / (R - L)) * 100;
+    const rangeBar = prices.length ? `
+      <div class="pricemap" aria-label="가격 분포">
+        <div class="pm-track">
+          ${min != null ? `<div class="pm-band" style="left:${pos(min)}%;width:${Math.max(0.5, pos(max) - pos(min))}%"></div>` : ''}
+          ${sorted.filter((x) => x.total != null).map((x) => `<span class="pm-dot" style="left:${pos(x.total)}%" title="${esc(x.platform)} ${esc(x.seller || '')} · ${won(x.total)}"></span>`).join('')}
+          ${cost != null ? `<span class="pm-mark cost" style="left:${pos(cost)}%"><i></i><b>도착원가 ${won(cost)}</b></span>` : ''}
+          ${ours != null ? `<span class="pm-mark ours" style="left:${pos(ours)}%"><i></i><b>우리 ${won(ours)}</b></span>` : ''}
+        </div>
+        <div class="pm-legend"><span><i class="lg-dot"></i>경쟁사 실구매가</span>${ours != null ? '<span><i class="lg-ours"></i>우리 목표 판매가</span>' : ''}${cost != null ? '<span><i class="lg-cost"></i>우리 도착원가</span>' : ''}</div>
+      </div>` : '';
+
+    body.innerHTML = `
+      <section>
+        <div class="section-head">
+          <h2>경쟁사 비교<span>${list.length}개</span></h2>
+          <button class="btn primary" data-act="new-comp">경쟁사 상품 추가</button>
+        </div>
+        ${list.length ? `
+          <div class="panel vs">
+            <div class="vs-grid">
+              <div class="vs-col ours">
+                <h3>우리</h3>
+                <dl>
+                  <div><dt>목표 판매가</dt><dd>${won(ours)}</dd></div>
+                  <div><dt>${best?.chosen ? '선택 소싱처 도착원가' : '최저 도착원가'}</dt><dd>${won(cost)}</dd></div>
+                  <div><dt>예상 마진율</dt><dd class="${mCls(ours)}">${m(ours)}</dd></div>
+                </dl>
+              </div>
+              <div class="vs-col theirs">
+                <h3>경쟁사 실구매가 <small>판매가 + 배송비</small></h3>
+                <dl>
+                  <div><dt>최저</dt><dd>${won(min)}</dd><span class="vs-sub">맞추면 마진율 <b class="${mCls(min)}">${m(min)}</b></span>${min != null && min !== ours ? `<button class="btn small ghost" data-act="set-target" data-v="${min}">목표가로</button>` : ''}</div>
+                  <div><dt>평균</dt><dd>${won(avg)}</dd><span class="vs-sub">맞추면 마진율 <b class="${mCls(avg)}">${m(avg)}</b></span>${avg != null && avg !== ours ? `<button class="btn small ghost" data-act="set-target" data-v="${avg}">목표가로</button>` : ''}</div>
+                  <div><dt>최고</dt><dd>${won(max)}</dd><span class="vs-sub">맞추면 마진율 <b class="${mCls(max)}">${m(max)}</b></span></div>
+                </dl>
+              </div>
+            </div>
+            ${ours != null && avg != null ? `<p class="vs-verdict">우리 목표 판매가는 경쟁사 평균보다 ${ours <= avg ? `<b class="down">${won(avg - ours)} 저렴</b>` : `<b class="up">${won(ours - avg)} 비쌈</b>`}합니다.${min != null && ours <= min ? ' 경쟁사 중 가장 저렴합니다.' : ''}</p>` : ours == null ? '<p class="vs-verdict muted">요약·이미지 탭에서 목표 판매가를 정하면 경쟁사와 바로 비교됩니다.</p>' : ''}
+            ${rangeBar}
+          </div>
+
+          <div class="table-wrap">
+            <table class="cmp">
+              <thead><tr>
+                <th>플랫폼</th><th>상품</th><th class="num">판매가</th><th class="num">배송비</th><th class="num">실구매가</th>
+                <th>우리 판매가 대비</th><th class="num">리뷰</th><th class="num">평점</th><th>판매량 · 순위</th><th>등록</th><th></th>
+              </tr></thead>
+              <tbody>
+                ${sorted.map((x) => {
+                  const thumb = x.images?.[0];
+                  return `
+                  <tr class="${x.total != null && x.total === min && prices.length > 1 ? 'best' : ''}">
+                    <td><div class="site">${esc(x.platform)}</div>${x.total != null && x.total === min && prices.length > 1 ? '<span class="tag best">최저가</span>' : ''}</td>
+                    <td>
+                      <div class="prod">
+                        ${thumb ? `<img src="${esc(imgUrl(thumb))}" alt="">` : '<span class="ph"></span>'}
+                        <div>
+                          <div class="prod-name">${esc(x.product_name || '(상품명 없음)')}</div>
+                          <div class="seller">${esc(x.seller || '')}</div>
+                          ${x.url ? `<a class="link" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(x.url) || '링크')} 열기 ↗</a>` : ''}
+                        </div>
+                      </div>
+                    </td>
+                    <td class="num">${won(x.price)}</td>
+                    <td class="num">${x.shipping_fee ? won(x.shipping_fee) : x.price != null ? '무료' : '-'}</td>
+                    <td class="num"><b>${won(x.total)}</b></td>
+                    <td>${diffLabel(x.total, ours)}</td>
+                    <td class="num">${x.review_count != null ? x.review_count.toLocaleString('ko-KR') : '-'}</td>
+                    <td class="num">${x.rating != null ? '★ ' + fmtNum(x.rating, 1) : '-'}</td>
+                    <td class="rating" style="white-space:normal;min-width:110px">${esc(x.sales_note || '-')}</td>
+                    <td class="rating">${x.created_by ? whoHTML(x.created_by) : '-'}</td>
+                    <td><div class="row-actions"><button class="btn small ghost" data-act="edit-comp" data-id="${x.id}">수정</button></div></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+          <p class="hint">실구매가 = 판매가 + 배송비. "맞추면 마진율"은 그 가격에 팔 때 우리 도착원가 기준 마진율입니다.</p>
+
+          <div class="src-cards">
+            ${sorted.map((x) => `
+              <article class="panel src-card">
+                <header>
+                  <h3>${esc(x.platform)}${x.seller ? ' · ' + esc(x.seller) : ''}<small>${esc(x.product_name || '')}</small></h3>
+                  <span><button class="btn small ghost" data-act="edit-comp" data-id="${x.id}">수정</button></span>
+                </header>
+                <div class="src-price">
+                  <div><span>실구매가</span><b>${won(x.total)}</b></div>
+                  <div><span>우리 판매가 대비</span><b style="font-size:14px">${diffLabel(x.total, ours)}</b></div>
+                </div>
+                ${(x.strengths || x.weaknesses) ? `
+                  <div class="pc">
+                    <div class="pro"><h4>경쟁사 강점</h4>${para(x.strengths)}</div>
+                    <div class="con"><h4>경쟁사 약점 · 우리 기회</h4>${para(x.weaknesses)}</div>
+                  </div>` : ''}
+                ${x.memo ? `<p class="src-memo">${nl2br(x.memo)}</p>` : ''}
+                ${(x.images || []).length ? `<div class="src-shots">${shotsHTML(x.images)}</div>` : ''}
+                <p class="src-memo" style="font-size:12.5px">${x.created_by ? whoHTML(x.created_by, '등록 · ' + ago(x.created_at)) : ''}</p>
+              </article>`).join('')}
+          </div>
+        ` : `
+          <div class="empty">
+            <h2>아직 경쟁사 상품이 없습니다</h2>
+            <p>쿠팡, 스마트스토어 등에서 실제로 팔리고 있는 비슷한 상품을 추가하면, 우리 판매가·도착원가와 나란히 비교할 수 있습니다.</p>
+            <button class="btn primary" data-act="new-comp">경쟁사 상품 추가</button>
+          </div>`}
+      </section>`;
+  }
+
+  function openCompetitorForm(candidateId, x) {
+    const v = (k) => esc(x?.[k] ?? '');
+    const form = openModal(`
+      <form novalidate>
+        <header class="modal-head">
+          <h2>${x ? '경쟁사 상품 수정' : '경쟁사 상품 추가'}</h2>
+          <button type="button" class="icon-btn" data-close aria-label="닫기">✕</button>
+        </header>
+        <div class="modal-body">
+          <label>상품 링크 <small>붙여넣으면 플랫폼을 자동으로 채웁니다</small>
+            <input name="url" value="${v('url')}" placeholder="https://www.coupang.com/vp/products/..." autocomplete="off"></label>
+          <div class="row3">
+            <label>플랫폼 <input name="platform" list="comp-list" value="${v('platform')}" placeholder="예: 쿠팡">
+              <datalist id="comp-list">${COMP_PLATFORMS.map((p) => `<option value="${p}">`).join('')}</datalist></label>
+            <label>판매자 · 브랜드 <input name="seller" value="${v('seller')}" placeholder="예: ○○리빙"></label>
+            <label>상품명 <input name="product_name" value="${v('product_name')}"></label>
+          </div>
+          <div class="row4">
+            <label>판매가 <small>원</small><input name="price" inputmode="numeric" value="${x?.price ?? ''}" placeholder="19900"></label>
+            <label>배송비 <small>무료면 0</small><input name="shipping_fee" inputmode="numeric" value="${x?.shipping_fee ?? ''}" placeholder="0"></label>
+            <label>리뷰 수 <input name="review_count" inputmode="numeric" value="${x?.review_count ?? ''}" placeholder="1240"></label>
+            <label>평점 <input name="rating" inputmode="decimal" value="${x?.rating ?? ''}" placeholder="4.8"></label>
+          </div>
+          <label>판매량 · 순위 <input name="sales_note" value="${v('sales_note')}" placeholder="예: 월 1,000개 이상 / 카테고리 3위 / 로켓배송"></label>
+          <div class="row2" style="grid-template-columns:1fr 1fr">
+            <label>경쟁사 강점 <textarea name="strengths" rows="3" placeholder="상세페이지, 구성, 배송 속도 등">${v('strengths')}</textarea></label>
+            <label>경쟁사 약점 · 우리 기회 <textarea name="weaknesses" rows="3" placeholder="후기 불만, 옵션 부족, 가격 등">${v('weaknesses')}</textarea></label>
+          </div>
+          <label>메모 <textarea name="memo" rows="2">${v('memo')}</textarea></label>
+          <div class="field">이미지 <small>상세페이지·후기 캡처를 붙여넣어도 됩니다</small><div class="uploader"></div></div>
+        </div>
+        <footer class="modal-foot">
+          ${x ? '<button type="button" class="btn ghost danger" data-del-comp>삭제</button>' : ''}
+          <span class="muted" style="font-size:13px">${me ? whoHTML(me) + (x ? ' 이름으로 수정' : ' 이름으로 등록') : ''}</span>
+          <span class="spacer"></span>
+          <button type="button" class="btn" data-close>취소</button>
+          <button type="submit" class="btn primary">${x ? '변경 저장' : '경쟁사 추가'}</button>
+        </footer>
+      </form>`,
+    async (f, images) => {
+      const url = normUrl(f.url);
+      const payload = {
+        candidate_id: candidateId, url,
+        platform: (f.platform || '').trim() || guessPlatform(url) || '기타',
+        seller: f.seller.trim() || null, product_name: f.product_name.trim() || null,
+        price: numOrNull(f.price), shipping_fee: numOrNull(f.shipping_fee),
+        review_count: numOrNull(f.review_count), rating: decOrNull(f.rating),
+        sales_note: f.sales_note.trim() || null, strengths: f.strengths || null, weaknesses: f.weaknesses || null,
+        memo: f.memo || null, images
+      };
+      if (x) {
+        const { error } = await sb.from('competitors').update({ ...payload, ...stampUpd() }).eq('id', x.id);
+        if (error) throw error;
+      } else {
+        const { error } = await sb.from('competitors').insert({ ...payload, ...stampNew() });
+        if (error) throw error;
+      }
+      await loadAll();
+      toast(x ? '경쟁사 상품을 저장했습니다.' : '경쟁사 상품을 추가했습니다.');
+      state.tab = 'comp'; ls.set('sb_tab', 'comp');
+      await route(false);
+    }, x?.images);
+
+    const urlInput = form.querySelector('input[name=url]');
+    const pfInput = form.querySelector('input[name=platform]');
+    urlInput.addEventListener('input', () => {
+      const g = guessPlatform(normUrl(urlInput.value) || '');
+      if (g && (!pfInput.value || pfInput.dataset.auto === '1')) { pfInput.value = g; pfInput.dataset.auto = '1'; }
+    });
+    pfInput.addEventListener('input', () => { pfInput.dataset.auto = '0'; });
+
+    const del = form.querySelector('[data-del-comp]');
+    if (del) del.addEventListener('click', async () => {
+      if (!(await confirmBox('경쟁사 상품 삭제', `'${esc(x.product_name || x.platform)}'을(를) 삭제할까요? 첨부 이미지도 함께 지워집니다.`))) return;
+      const { error } = await sb.from('competitors').delete().eq('id', x.id);
+      if (error) { toast('삭제하지 못했습니다: ' + error.message, true); return; }
+      await removeFiles(x.images);
+      closeModal();
+      await loadAll();
+      toast('경쟁사 상품을 삭제했습니다.');
+      await route(false);
+    });
+  }
+
+  /* =========================================================
      라이트박스
      ========================================================= */
   const lb = { paths: [], i: 0 };
@@ -3692,6 +3971,19 @@ window.APP_CONFIG = {
         if (c) await renderDetail(c.id);
         break;
       case 'new-source': if (c) openSourceForm(c.id, null); break;
+      case 'new-comp': if (c) openCompetitorForm(c.id, null); break;
+      case 'edit-comp': {
+        const x = state.competitors.find((y) => y.id === el.dataset.id);
+        if (x) openCompetitorForm(x.candidate_id, x);
+        break;
+      }
+      case 'set-target': {
+        if (!c) break;
+        const v = +el.dataset.v;
+        if (!(await confirmBox('목표 판매가 바꾸기', `목표 판매가를 <b>${won(v)}</b>(으)로 바꿀까요?`, '바꾸기', false))) break;
+        await updateRow('candidates', c.id, { target_price: v, ...stampUpd() }, `목표 판매가를 ${won(v)}(으)로 바꿨습니다.`);
+        break;
+      }
       case 'edit-source': {
         const s = state.sources.find((x) => x.id === el.dataset.id);
         if (s) openSourceForm(s.candidate_id, s);
@@ -3978,7 +4270,26 @@ window.APP_CONFIG = {
             <td class="num">${yuan(s.cny_price)}</td><td class="num">${won(totalCost(s))}</td><td class="num">${won(arrivalCost(s))}</td><td class="num">${(() => { const mm = marginPct(c.target_price, arrivalCost(s)); return mm == null ? '-' : mm + '%'; })()}</td>
             <td class="num">${s.moq ? s.moq + '개' : '-'}</td><td class="num">${s.lead_days ? s.lead_days + '일' : '-'}</td></tr>`).join('')}
           </tbody>
-        </table>` : ''}`;
+        </table>` : ''}
+      ${(() => {
+        const comps = competitorsOf(c.id).map((x) => ({ ...x, total: compTotal(x) })).sort((a, b) => (a.total ?? 1e15) - (b.total ?? 1e15));
+        if (!comps.length) return '';
+        const ps = comps.map((x) => x.total).filter((v) => v != null);
+        const avg = ps.length ? Math.round(ps.reduce((s, v) => s + v, 0) / ps.length) : null;
+        return `
+        <h2>경쟁사 비교 (${comps.length}개)</h2>
+        ${ps.length ? `<p class="pdf-note">경쟁사 실구매가 최저 ${won(Math.min(...ps))} · 평균 ${won(avg)} · 최고 ${won(Math.max(...ps))}${c.target_price != null ? ` / 우리 목표 판매가 ${won(c.target_price)}` : ''}</p>` : ''}
+        <table class="pdf-cmp">
+          <thead><tr><th>플랫폼</th><th>판매자 · 상품명</th><th class="num">판매가</th><th class="num">배송비</th><th class="num">실구매가</th><th class="num">우리 대비</th><th class="num">리뷰</th><th class="num">평점</th><th>판매량 · 순위</th></tr></thead>
+          <tbody>${comps.map((x) => `<tr><td>${esc(x.platform)}</td><td>${esc([x.seller, x.product_name].filter(Boolean).join(' · '))}</td>
+            <td class="num">${won(x.price)}</td><td class="num">${x.shipping_fee ? won(x.shipping_fee) : '무료'}</td><td class="num">${won(x.total)}</td>
+            <td class="num">${x.total != null && c.target_price != null ? (x.total - c.target_price >= 0 ? '+' : '−') + won(Math.abs(x.total - c.target_price)) : '-'}</td>
+            <td class="num">${x.review_count != null ? x.review_count.toLocaleString('ko-KR') : '-'}</td><td class="num">${x.rating != null ? fmtNum(x.rating, 1) : '-'}</td><td>${esc(x.sales_note || '')}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        ${comps.some((x) => x.strengths || x.weaknesses) ? comps.filter((x) => x.strengths || x.weaknesses).map((x) => `
+          <div class="pdf-pc pdf-avoid"><div><h3>${esc(x.platform)}${x.seller ? ' ' + esc(x.seller) : ''} 강점</h3>${nl2br(x.strengths || '-')}</div><div><h3>약점 · 우리 기회</h3>${nl2br(x.weaknesses || '-')}</div></div>`).join('') : ''}`;
+      })()}`;
     await exportPDF(html, `${c.title}_요약`);
   }
 
