@@ -702,6 +702,38 @@ body { overflow-wrap: anywhere; }
 .lg-dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--muted); }
 .lg-ours { width: 3px; height: 12px; background: var(--accent); }
 .lg-cost { width: 3px; height: 12px; background: var(--picked); }
+
+/* ===== 발주서 양식 ===== */
+.modal-head { gap: 12px; }
+.modal-head h2 { margin-right: auto; }
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--line); }
+.seg label { display: block !important; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg span { display: block; padding: 5px 12px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg input:checked + span { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); }
+form .only-simple { display: none; }
+form.po-simple .only-full { display: none !important; }
+form.po-simple .only-simple { display: block; }
+.simple-note { margin: 0; font-size: 13px; color: var(--muted); background: var(--surface-2); border-radius: 8px; padding: 8px 12px; }
+.order-row .pill { margin-left: -6px; }
+
+/* ===== 발주서 옵션 사진 ===== */
+.po-img-cell { width: 70px; }
+.po-ph { width: 56px; height: 56px; padding: 0; border: 1.5px dashed var(--line-strong); border-radius: 8px; background: var(--surface-2); cursor: pointer; display: grid; place-items: center; overflow: hidden; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.po-ph:hover { border-color: var(--accent); color: var(--accent); }
+.po-ph.has { border-style: solid; background: #fff; }
+.po-ph img { width: 100%; height: 100%; object-fit: contain; }
+.po-ph.busy { opacity: .6; }
+.po-img-cell.over .po-ph { border-color: var(--accent); background: var(--accent-soft); }
+.po-edit tr.row-on td { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+.po-picker { width: 300px; }
+.pk-hint { font-size: 12px; color: var(--muted); padding: 2px 10px 6px; }
+.pk-title { font-size: 12px; font-weight: 700; color: var(--muted); padding: 6px 10px 4px; }
+.pk-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 0 6px 6px; }
+.menu .pk-grid button { padding: 0; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; }
+.menu .pk-grid button:hover { border-color: var(--accent); }
+.pk-grid img { width: 100%; height: 100%; object-fit: contain; }
 </style>
 </head>
 <body>
@@ -1765,7 +1797,8 @@ window.APP_CONFIG = {
         ? [{ icon: '🖨️', label: 'PDF로 저장', run: () => exportDocPDF(c) }]
         : [{ icon: '🖨️', label: '요약 + 최종 소싱처 PDF', run: () => exportSummaryPDF(c) },
            { icon: '🖨️', label: '문서 PDF', run: () => exportDocPDF(c) },
-           { icon: '🧾', label: '발주서 만들기', run: () => openOrderForm(c, pickOrderSource(c)) }]),
+           { icon: '🧾', label: '발주서 만들기', run: () => openOrderForm(c, pickOrderSource(c), null, 'full') },
+           { icon: '🧾', label: '간이 발주서 만들기', run: () => openOrderForm(c, pickOrderSource(c), null, 'simple') }]),
       '-',
       { icon: '🔗', label: '링크 복사', run: () => {
         navigator.clipboard?.writeText(location.href.split('#')[0] + '#/c/' + c.id).then(() => toast('링크를 복사했습니다.'));
@@ -3916,7 +3949,8 @@ window.APP_CONFIG = {
           { icon: '🖨️', label: '요약·이미지 + 최종 소싱처 PDF', run: () => exportSummaryPDF(c) },
           { icon: '🖨️', label: '문서 PDF', run: () => exportDocPDF(c) },
           '-',
-          { icon: '🧾', label: '발주서 만들기', run: () => openOrderForm(c, pickOrderSource(c)) }
+          { icon: '🧾', label: '발주서 만들기', run: () => openOrderForm(c, pickOrderSource(c), null, 'full') },
+          { icon: '🧾', label: '간이 발주서 만들기', run: () => openOrderForm(c, pickOrderSource(c), null, 'simple') }
         ]);
         break;
       case 'new-order': {
@@ -3940,6 +3974,7 @@ window.APP_CONFIG = {
         if (!o || !(await confirmBox('발주서 삭제', `'${esc(o.po_number)}' 발주서를 삭제할까요?`))) break;
         const { error } = await sb.from('orders').delete().eq('id', o.id);
         if (error) { toast('삭제하지 못했습니다: ' + error.message, true); break; }
+        await removeFiles((o.data?.items || []).filter((it) => it.image_owned).map((it) => it.image));
         await loadAll();
         toast('발주서를 삭제했습니다.');
         await route(false);
@@ -4125,8 +4160,18 @@ window.APP_CONFIG = {
     .po-parties h3{font-size:12.5px;background:#17201d;color:#fff;padding:5px 9px;margin:0;border-radius:4px 4px 0 0}
     .po-parties td,.po-parties th{border:1px solid #cfd5cf;padding:5px 8px;text-align:left;font-size:11.5px;vertical-align:top}
     .po-parties th{background:#f3f5f2;width:92px;white-space:nowrap}
-    .po-items{margin-top:16px}
-    .po-items th,.po-items td{border:1px solid #9aa39f;padding:7px 8px;font-size:12px}
+    .po-items{margin-top:16px;table-layout:fixed}
+    .po-items th,.po-items td{border:1px solid #9aa39f;padding:7px 8px;font-size:12px;vertical-align:middle;line-height:1.5}
+    .pdf-root .brk{word-break:break-all;overflow-wrap:break-word}
+    .po-items td.po-pic{padding:4px;text-align:center}
+    .po-items td.po-pic img{width:72px;height:72px;object-fit:contain;display:inline-block;background:#fff;border-radius:3px}
+    .po-simple-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:10px;border-bottom:2px solid #17201d}
+    .po-simple-head h1{font-size:22px;letter-spacing:.15em;margin:0}
+    .po-simple-head h1 .zh{letter-spacing:.1em;font-size:13px;margin-left:8px}
+    .po-simple-meta{font-size:11.5px;color:#3b4541;text-align:right;line-height:1.7}
+    .po-simple-info{margin-top:12px;table-layout:fixed}
+    .po-simple-info th,.po-simple-info td{border:1px solid #cfd5cf;padding:6px 9px;font-size:12px;text-align:left;vertical-align:middle}
+    .po-simple-info th{background:#f3f5f2;width:110px;white-space:nowrap}
     .po-items thead th{background:#17201d;color:#fff;text-align:center}
     .po-items .num{text-align:right;white-space:nowrap}
     .po-items .c{text-align:center}
@@ -4165,6 +4210,8 @@ window.APP_CONFIG = {
     holder.innerHTML = `<style>${PDF_CSS}</style><div class="pdf-root">${innerHTML}</div>`;
     document.body.append(holder);
     const root = holder.querySelector('.pdf-root');
+    // 요약·문서 PDF의 표에서도 긴 중국어 상품명이 옆 칸을 덮지 않게
+    $$('td', root).forEach((td) => { if (needsBreak(td.textContent)) td.classList.add('brk'); });
     // 이미지를 data URL로 바꿔서 PDF에 확실히 들어가게 함
     await Promise.all($$('img', root).map(async (img) => {
       try {
@@ -4345,7 +4392,7 @@ window.APP_CONFIG = {
           const d = o.data || {};
           const t = orderTotals(d);
           return `<div class="order-row">
-            <b>${esc(o.po_number)}</b>
+            <b>${esc(o.po_number)}</b>${d.form_type === 'simple' ? '<span class="pill s-hold">간이</span>' : ''}
             <span>${esc(d.supplier?.name || '')}</span>
             <span class="num">${moneyOf(d.currency)(t.total)}</span>
             <span class="muted">${o.created_by ? whoHTML(o.created_by, '· ' + ago(o.created_at)) : ago(o.created_at)}</span>
@@ -4358,11 +4405,12 @@ window.APP_CONFIG = {
       </div>`;
   }
 
-  function openOrderForm(c, s, order) {
+  function openOrderForm(c, s, order, type) {
     const co = state.settings.company || {};
     const cur0 = s && s.cny_price != null ? 'CNY' : 'KRW';
     const d = order ? JSON.parse(JSON.stringify(order.data || {})) : {
       lang: ls.get('sb_po_lang', 'kozh'),
+      form_type: type || ls.get('sb_po_type', 'full'),
       number: nextPoNumber(), date: today(), due: '',
       currency: cur0,
       supplier: { name: s ? (s.site + (s.product_name ? '' : '')) : '', contact: '', phone: '', url: s?.url || '' },
@@ -4376,6 +4424,13 @@ window.APP_CONFIG = {
     const itemRow = (it, i) => `
       <tr data-row>
         <td class="c">${i + 1}</td>
+        <td class="po-img-cell">
+          <button type="button" class="po-ph ${it.image ? 'has' : ''}" data-img-pick title="옵션 사진 넣기 (클릭, 끌어놓기, 또는 이 줄에서 Ctrl+V)">
+            ${it.image ? `<img data-path="${esc(it.image)}" src="${esc(imgUrl(it.image))}" alt="">` : '<span>+ 사진</span>'}
+          </button>
+          <input type="hidden" name="it_image" value="${v(it.image)}">
+          <input type="hidden" name="it_image_owned" value="${it.image_owned ? '1' : ''}">
+        </td>
         <td><input name="it_name" value="${v(it.name)}" placeholder="품명"></td>
         <td><input name="it_option" value="${v(it.option)}" placeholder="색상 / 사이즈 / 규격"></td>
         <td><input name="it_qty" inputmode="numeric" value="${v(it.qty)}" style="text-align:right"></td>
@@ -4388,6 +4443,10 @@ window.APP_CONFIG = {
       <form novalidate>
         <header class="modal-head">
           <h2>🧾 ${order ? '발주서 수정' : '발주서 만들기'}</h2>
+          <div class="seg" role="radiogroup" aria-label="양식">
+            <label><input type="radio" name="form_type" value="full" ${d.form_type !== 'simple' ? 'checked' : ''}><span>정식 발주서</span></label>
+            <label><input type="radio" name="form_type" value="simple" ${d.form_type === 'simple' ? 'checked' : ''}><span>간이 발주서</span></label>
+          </div>
           <button type="button" class="icon-btn" data-close aria-label="닫기">✕</button>
         </header>
         <div class="modal-body">
@@ -4407,7 +4466,7 @@ window.APP_CONFIG = {
               <label>상품 링크 <input name="sup_url" value="${v(d.supplier?.url)}"></label>
             </div>
           </fieldset>
-          <fieldset class="po-fs"><legend>발주처 (우리 회사)</legend>
+          <fieldset class="po-fs only-full"><legend>발주처 (우리 회사)</legend>
             <div class="row2" style="grid-template-columns:1fr 1fr">
               <label>상호 <input name="buy_name" value="${v(d.buyer?.name)}"></label>
               <label>담당자 <input name="buy_contact" value="${v(d.buyer?.contact)}"></label>
@@ -4427,24 +4486,25 @@ window.APP_CONFIG = {
                 </select></label>
             </div>
             <div class="table-wrap">
-              <table class="cmp po-edit" style="min-width:680px">
-                <thead><tr><th style="width:36px">No</th><th>품명</th><th>옵션 · 규격</th><th style="width:90px">수량</th><th style="width:110px">단가</th><th class="num" style="width:120px">금액</th><th style="width:40px"></th></tr></thead>
+              <table class="cmp po-edit" style="min-width:760px">
+                <thead><tr><th style="width:36px">No</th><th style="width:70px">사진</th><th>품명</th><th>옵션 · 규격</th><th style="width:90px">수량</th><th style="width:110px">단가</th><th class="num" style="width:120px">금액</th><th style="width:40px"></th></tr></thead>
                 <tbody id="po-items">${d.items.map(itemRow).join('')}</tbody>
                 <tfoot>
-                  <tr><td colspan="5" class="num">소계</td><td class="num" id="po-sub">-</td><td></td></tr>
-                  <tr><td colspan="5" class="num">배송비 <input name="shipping" inputmode="decimal" value="${v(d.shipping)}" style="width:110px;display:inline-block;text-align:right;margin-left:6px"></td><td class="num" id="po-ship">-</td><td></td></tr>
-                  <tr><td colspan="5" class="num"><b>합계</b></td><td class="num"><b id="po-total">-</b></td><td></td></tr>
+                  <tr><td colspan="6" class="num">소계</td><td class="num" id="po-sub">-</td><td></td></tr>
+                  <tr><td colspan="6" class="num">배송비 <input name="shipping" inputmode="decimal" value="${v(d.shipping)}" style="width:110px;display:inline-block;text-align:right;margin-left:6px"></td><td class="num" id="po-ship">-</td><td></td></tr>
+                  <tr><td colspan="6" class="num"><b>합계</b></td><td class="num"><b id="po-total">-</b></td><td></td></tr>
                 </tfoot>
               </table>
             </div>
             <button type="button" class="btn small" data-row-add style="margin-top:8px">+ 품목 추가</button>
           </div>
-          <div class="row2" style="grid-template-columns:1fr 1fr">
+          <p class="only-simple simple-note">간이 발주서에는 발주번호·날짜, 공급처, 품목·합계${s && (s.images || []).length ? ', 상품 이미지' : ''}만 들어갑니다. 우리 회사명은 아래에 저장된 정보로 한 줄만 표시됩니다.</p>
+          <div class="row2 only-full" style="grid-template-columns:1fr 1fr">
             <label>배송지 <input name="ship_to" value="${v(d.ship_to)}"></label>
             <label>결제 조건 <input name="payment" value="${v(d.payment)}" placeholder="예: 선금 30%, 출고 전 잔금"></label>
           </div>
-          <label>비고 <textarea name="note" rows="3" placeholder="포장, 라벨, 검수 요청 사항 등">${v(d.note)}</textarea></label>
-          ${s && (s.images || []).length ? `<label class="check"><input type="checkbox" name="include_image" ${d.include_image !== false ? 'checked' : ''}> 소싱처 상품 이미지 넣기</label>` : ''}
+          <label class="only-full">비고 <textarea name="note" rows="3" placeholder="포장, 라벨, 검수 요청 사항 등">${v(d.note)}</textarea></label>
+          ${s && (s.images || []).length ? `<label class="check"><input type="checkbox" name="include_image" ${d.include_image !== false ? 'checked' : ''}> 소싱처 대표 이미지 넣기 <small style="font-weight:400;color:var(--muted)">(옵션 사진을 넣으면 생략됩니다)</small></label>` : ''}
         </div>
         <footer class="modal-foot">
           <span class="muted" style="font-size:13px">${s ? `기준 소싱처: ${esc(s.site)}` : '소싱처 없이 작성'}</span>
@@ -4459,17 +4519,20 @@ window.APP_CONFIG = {
         name: tr.querySelector('[name=it_name]').value.trim(),
         option: tr.querySelector('[name=it_option]').value.trim(),
         qty: decOrNull(tr.querySelector('[name=it_qty]').value) ?? 0,
-        price: decOrNull(tr.querySelector('[name=it_price]').value) ?? 0
-      })).filter((it) => it.name || it.qty || it.price);
+        price: decOrNull(tr.querySelector('[name=it_price]').value) ?? 0,
+        image: tr.querySelector('[name=it_image]').value || null,
+        image_owned: tr.querySelector('[name=it_image_owned]').value === '1'
+      })).filter((it) => it.name || it.qty || it.price || it.image);
       if (!items.length) throw new Error('품목을 1개 이상 입력해 주세요.');
       const data = {
-        lang: f.lang, number: f.number.trim() || nextPoNumber(), date: f.date, due: f.due, currency: f.currency,
+        lang: f.lang, form_type: f.form_type === 'simple' ? 'simple' : 'full', number: f.number.trim() || nextPoNumber(), date: f.date, due: f.due, currency: f.currency,
         supplier: { name: f.sup_name.trim(), contact: f.sup_contact.trim(), phone: f.sup_phone.trim(), url: normUrl(f.sup_url) || '' },
         buyer: { name: f.buy_name.trim(), contact: f.buy_contact.trim(), phone: f.buy_phone.trim(), address: f.buy_address.trim(), biz: f.buy_biz.trim() },
         ship_to: f.ship_to.trim(), payment: f.payment.trim(), shipping: decOrNull(f.shipping) ?? 0, note: f.note || '',
         items, include_image: f.include_image === 'on'
       };
       ls.set('sb_po_lang', data.lang);
+      ls.set('sb_po_type', data.form_type);
       let saved;
       if (order) {
         const { data: r, error } = await sb.from('orders').update({ po_number: data.number, data, ...stampUpd() }).eq('id', order.id).select().single();
@@ -4483,6 +4546,11 @@ window.APP_CONFIG = {
       if (f.save_company === 'on') {
         try { await saveSetting('company', { ...data.buyer, ship_to: data.ship_to, payment: data.payment }); } catch (err) { console.warn(err); }
       }
+      // 이 발주서에서 올렸다가 뺀 옵션 사진은 저장소에서도 지움
+      poSaved = true;
+      const keep = new Set(items.map((it) => it.image).filter(Boolean));
+      const oldOwned = (order?.data?.items || []).filter((it) => it.image_owned).map((it) => it.image);
+      await removeFiles([...oldOwned, ...poUploaded].filter((pth) => pth && !keep.has(pth)));
       await loadAll();
       toast(`발주서 ${data.number}을(를) 저장했습니다.`);
       state.tab = 'sources'; ls.set('sb_tab', 'sources');
@@ -4490,6 +4558,113 @@ window.APP_CONFIG = {
       if (submitter?.dataset.pdf) exportOrderPDF(state.orders.find((o) => o.id === saved.id) || saved);
     });
 
+    // ----- 옵션 사진 -----
+    let poSaved = false;
+    const poUploaded = [];
+    modal.addEventListener('close', () => { if (!poSaved && poUploaded.length) removeFiles(poUploaded); }, { once: true });
+    let lastImgRow = null;
+
+    function setRowImage(tr, path, owned) {
+      const cell = tr.querySelector('.po-img-cell');
+      cell.querySelector('[name=it_image]').value = path || '';
+      cell.querySelector('[name=it_image_owned]').value = path && owned ? '1' : '';
+      const btn = cell.querySelector('.po-ph');
+      btn.classList.toggle('has', !!path);
+      btn.innerHTML = path ? `<img data-path="${esc(path)}" src="${esc(imgUrl(path))}" alt="">` : '<span>+ 사진</span>';
+    }
+    async function uploadRowImage(tr, file) {
+      const btn = tr.querySelector('.po-ph');
+      btn.classList.add('busy');
+      btn.innerHTML = '<span>압축 중…</span>';
+      try {
+        const blob = await compressImage(file);
+        const path = await uploadBlob(blob);
+        poUploaded.push(path);
+        await ensureUrls([path]);
+        setRowImage(tr, path, true);
+      } catch (err) {
+        toast('사진을 올리지 못했습니다: ' + err.message, true);
+        setRowImage(tr, tr.querySelector('[name=it_image]').value, tr.querySelector('[name=it_image_owned]').value === '1');
+      } finally { btn.classList.remove('busy'); }
+    }
+    const fileIn = document.createElement('input');
+    fileIn.type = 'file'; fileIn.accept = 'image/*'; fileIn.hidden = true;
+    form.append(fileIn);
+    fileIn.addEventListener('change', () => { if (fileIn.files[0] && lastImgRow) uploadRowImage(lastImgRow, fileIn.files[0]); fileIn.value = ''; });
+
+    async function openImgPicker(btn, tr) {
+      lastImgRow = tr;
+      const pool = [...new Set([...(s?.images || []), ...sourcesOf(c.id).flatMap((x) => x.images || []), ...(c.images || [])])].slice(0, 24);
+      await ensureUrls(pool);
+      closeMenu();
+      const m = document.createElement('div');
+      m.className = 'menu po-picker';
+      const has = !!tr.querySelector('[name=it_image]').value;
+      m.innerHTML = `
+        <button type="button" data-pk="file"><span class="mi">📁</span>내 컴퓨터에서 고르기</button>
+        <div class="pk-hint">또는 이미지를 복사한 뒤 이 줄을 클릭하고 <kbd>Ctrl</kbd>+<kbd>V</kbd></div>
+        ${pool.length ? `<div class="pk-title">등록된 이미지에서 고르기</div>
+          <div class="pk-grid">${pool.map((pp) => `<button type="button" data-pk-path="${esc(pp)}"><img src="${esc(imgUrl(pp))}" alt=""></button>`).join('')}</div>` : ''}
+        ${has ? '<hr><button type="button" data-pk="clear" class="danger"><span class="mi">🗑️</span>사진 빼기</button>' : ''}`;
+      // 발주서 창(모달) 안에 띄워야 창 뒤로 숨지 않음
+      m.style.position = 'fixed';
+      modal.append(m);
+      const r = btn.getBoundingClientRect();
+      let top = r.bottom + 4;
+      if (r.bottom + m.offsetHeight + 8 > window.innerHeight) top = Math.max(8, r.top - m.offsetHeight - 4);
+      m.style.top = top + 'px';
+      m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + 'px';
+      const body = form.querySelector('.modal-body');
+      const onScroll = () => { closeMenu(); body.removeEventListener('scroll', onScroll); };
+      body.addEventListener('scroll', onScroll);
+      openMenuEl = m;
+      m.addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        closeMenu();
+        if (b.dataset.pk === 'file') fileIn.click();
+        else if (b.dataset.pk === 'clear') setRowImage(tr, null);
+        else if (b.dataset.pkPath) setRowImage(tr, b.dataset.pkPath, false);
+      });
+    }
+
+    const tbodyEl = form.querySelector('#po-items');
+    tbodyEl.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-img-pick]');
+      const tr = e.target.closest('tr[data-row]');
+      if (tr) { lastImgRow = tr; $$('tr[data-row]', tbodyEl).forEach((x) => x.classList.toggle('row-on', x === tr)); }
+      if (b) openImgPicker(b, tr);
+    });
+    tbodyEl.addEventListener('focusin', (e) => {
+      const tr = e.target.closest('tr[data-row]');
+      if (tr) { lastImgRow = tr; $$('tr[data-row]', tbodyEl).forEach((x) => x.classList.toggle('row-on', x === tr)); }
+    });
+    tbodyEl.addEventListener('dragover', (e) => { const cell = e.target.closest('.po-img-cell'); if (cell) { e.preventDefault(); cell.classList.add('over'); } });
+    tbodyEl.addEventListener('dragleave', (e) => { e.target.closest('.po-img-cell')?.classList.remove('over'); });
+    tbodyEl.addEventListener('drop', (e) => {
+      const cell = e.target.closest('.po-img-cell'); if (!cell) return;
+      e.preventDefault(); cell.classList.remove('over');
+      const f0 = imageFilesFrom(e.dataTransfer)[0];
+      if (f0) uploadRowImage(cell.closest('tr'), f0);
+    });
+    form.addEventListener('paste', (e) => {
+      const f0 = imageFilesFrom(e.clipboardData)[0];
+      if (!f0) return;
+      const tr = e.target.closest?.('tr[data-row]') || lastImgRow || tbodyEl.querySelector('tr[data-row]');
+      if (!tr) return;
+      e.preventDefault(); e.stopPropagation();
+      uploadRowImage(tr, f0);
+    });
+    // 저장된 사진 주소 불러오기
+    (async () => {
+      const imgs = $$('img[data-path]', tbodyEl);
+      if (!imgs.length) return;
+      await ensureUrls(imgs.map((i) => i.dataset.path));
+      imgs.forEach((i) => { i.src = imgUrl(i.dataset.path); });
+    })();
+
+    const syncType = () => form.classList.toggle('po-simple', form.querySelector('[name=form_type]:checked')?.value === 'simple');
+    form.querySelectorAll('[name=form_type]').forEach((r) => r.addEventListener('change', syncType));
+    syncType();
     modal.classList.add('wide');
     modal.addEventListener('close', () => modal.classList.remove('wide'), { once: true });
     const tbody = form.querySelector('#po-items');
@@ -4528,6 +4703,34 @@ window.APP_CONFIG = {
     recalc();
   }
 
+  // 띄어쓰기 없는 중국어·긴 영문은 칸 안에서 줄바꿈되도록 표시
+  const needsBreak = (t) => /[\u3400-\u9fff\uf900-\ufaff]/.test(t || '') || /\S{24,}/.test(t || '');
+  const brkCell = (t, extra = '') => `<td class="${needsBreak(t) ? 'brk' : ''} ${extra}">${esc(t || '')}</td>`;
+
+  function poItemsTable(d, L, money, t) {
+    const pic = (d.items || []).some((it) => it.image);
+    const span = pic ? 6 : 5;
+    return `
+      <table class="po-items">
+        <colgroup><col style="width:34px">${pic ? '<col style="width:84px">' : ''}<col><col style="width:${pic ? 130 : 150}px"><col style="width:60px"><col style="width:88px"><col style="width:100px"></colgroup>
+        <thead><tr>
+          <th>No</th>${pic ? `<th>${L('사진', '图片')}</th>` : ''}<th>${L('품명', '品名')}</th><th>${L('옵션 · 규격', '规格')}</th>
+          <th>${L('수량', '数量')}</th><th>${L('단가', '单价')}</th><th>${L('금액', '金额')}</th>
+        </tr></thead>
+        <tbody>
+          ${(d.items || []).map((it, i) => `<tr>
+            <td class="c">${i + 1}</td>${pic ? `<td class="po-pic">${it.image && imgUrl(it.image) ? `<img src="${esc(imgUrl(it.image))}">` : ''}</td>` : ''}${brkCell(it.name)}${brkCell(it.option)}
+            <td class="num">${fmtNum(it.qty || 0, 2)}</td><td class="num">${money(it.price || 0)}</td><td class="num">${money((it.qty || 0) * (it.price || 0))}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          ${t.ship ? `<tr><td colspan="${span}" class="num">${L('소계', '小计')}</td><td class="num">${money(t.sub)}</td></tr>
+          <tr><td colspan="${span}" class="num">${L('배송비', '运费')}</td><td class="num">${money(t.ship)}</td></tr>` : ''}
+          <tr class="grand"><td colspan="${span}" class="num">${L('합계', '合计')}</td><td class="num">${money(t.total)}</td></tr>
+        </tfoot>
+      </table>`;
+  }
+
   async function exportOrderPDF(o) {
     const d = o.data || {};
     const c = state.candidates.find((x) => x.id === o.candidate_id);
@@ -4536,9 +4739,33 @@ window.APP_CONFIG = {
     const L = (ko, cn) => zh ? `${ko}<span class="zh">${cn}</span>` : ko;
     const money = moneyOf(d.currency);
     const t = orderTotals(d);
-    const imgPath = d.include_image && s?.images?.[0];
-    if (imgPath) await ensureUrls([imgPath]);
-    const kv = (k, val) => `<tr><th>${k}</th><td>${val ? esc(val) : ''}</td></tr>`;
+    // 옵션별 사진이 있으면 아래쪽 큰 참고 이미지는 생략 (한 장에 들어가도록)
+    const imgPath = !(d.items || []).some((it) => it.image) && d.include_image && s?.images?.[0];
+    await ensureUrls([imgPath, ...(d.items || []).map((it) => it.image)].filter(Boolean));
+    const kv = (k, val) => `<tr><th>${k}</th><td class="${needsBreak(val) ? 'brk' : ''}">${val ? esc(val) : ''}</td></tr>`;
+    const imgBlock = imgPath ? `<div class="po-img pdf-avoid"><img src="${esc(imgUrl(imgPath))}"><div class="pdf-note">${L('상품 참고 이미지', '产品参考图片')}${c ? '<br>' + esc(c.title) : ''}</div></div>` : '';
+
+    if (d.form_type === 'simple') {
+      const sup = [d.supplier?.name, d.supplier?.contact, d.supplier?.phone].filter(Boolean).join(' · ');
+      const html = `
+        <div class="po-simple-head">
+          <h1>${zh ? '간이 발주서<span class="zh">简易采购单</span>' : '간이 발주서'}</h1>
+          <div class="po-simple-meta">
+            ${L('발주번호', '订单号')} <b>${esc(d.number || o.po_number)}</b><br>
+            ${L('발주일', '下单日期')} ${esc(d.date || '')}${d.due ? ` · ${L('납기', '交货')} ${esc(d.due)}` : ''}
+          </div>
+        </div>
+        <table class="po-simple-info">
+          <tr><th>${L('공급처', '供应商')}</th><td class="${needsBreak(sup) ? 'brk' : ''}">${esc(sup)}</td></tr>
+          ${d.supplier?.url ? `<tr><th>${L('링크', '链接')}</th><td class="brk">${esc(d.supplier.url)}</td></tr>` : ''}
+          ${d.buyer?.name ? `<tr><th>${L('발주처', '采购方')}</th><td>${esc([d.buyer.name, d.buyer.contact, d.buyer.phone].filter(Boolean).join(' · '))}</td></tr>` : ''}
+        </table>
+        ${poItemsTable(d, L, money, t)}
+        ${imgBlock}`;
+      await exportPDF(html, `${d.number || o.po_number}_간이발주서`);
+      return;
+    }
+
     const html = `
       <div class="po-top">
         <h1>${zh ? '발주서<span class="zh">采 购 单</span>' : '발 주 서'}</h1>
@@ -4560,24 +4787,8 @@ window.APP_CONFIG = {
           ${kv(L('주소', '地址'), d.buyer?.address)}
         </table></div>
       </div>
-      <table class="po-items">
-        <thead><tr>
-          <th style="width:34px">No</th><th>${L('품명', '品名')}</th><th>${L('옵션 · 규격', '规格')}</th>
-          <th style="width:70px">${L('수량', '数量')}</th><th style="width:100px">${L('단가', '单价')}</th><th style="width:116px">${L('금액', '金额')}</th>
-        </tr></thead>
-        <tbody>
-          ${(d.items || []).map((it, i) => `<tr>
-            <td class="c">${i + 1}</td><td>${esc(it.name)}</td><td>${esc(it.option || '')}</td>
-            <td class="num">${fmtNum(it.qty || 0, 2)}</td><td class="num">${money(it.price || 0)}</td><td class="num">${money((it.qty || 0) * (it.price || 0))}</td>
-          </tr>`).join('')}
-        </tbody>
-        <tfoot>
-          <tr><td colspan="5" class="num">${L('소계', '小计')}</td><td class="num">${money(t.sub)}</td></tr>
-          <tr><td colspan="5" class="num">${L('배송비', '运费')}</td><td class="num">${money(t.ship)}</td></tr>
-          <tr class="grand"><td colspan="5" class="num">${L('합계', '合计')}</td><td class="num">${money(t.total)}</td></tr>
-        </tfoot>
-      </table>
-      ${imgPath ? `<div class="po-img pdf-avoid"><img src="${esc(imgUrl(imgPath))}"><div class="pdf-note">${L('상품 참고 이미지', '产品参考图片')}${c ? '<br>' + esc(c.title) : ''}</div></div>` : ''}
+      ${poItemsTable(d, L, money, t)}
+      ${imgBlock}
       <table class="po-terms pdf-avoid">
         <tr><th>${L('배송지', '收货地址')}</th><td>${esc(d.ship_to || '')}</td></tr>
         <tr><th>${L('결제 조건', '付款方式')}</th><td>${esc(d.payment || '')}</td></tr>
