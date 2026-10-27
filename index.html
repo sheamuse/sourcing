@@ -745,6 +745,28 @@ form.po-simple .only-simple { display: block; }
 .link-bubble button { border: 0; background: transparent; border-radius: 6px; padding: 4px 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .link-bubble button:hover { background: var(--surface-2); }
 .link-bubble button[data-lk=unlink] { color: var(--danger); }
+
+/* ===== 댓글 ===== */
+.cm-panel { padding: 6px 18px 16px; }
+.cm-list { list-style: none; margin: 0; padding: 0; }
+.cm { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.cm .avatar, .cm-new .avatar { width: 30px; height: 30px; font-size: 13px; margin-top: 1px; }
+.cm-main { flex: 1; min-width: 0; }
+.cm-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.cm-meta b { color: var(--ink); font-size: 14px; }
+.cm-acts { margin-left: auto; display: inline-flex; gap: 2px; }
+.cm-acts button { border: 0; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 600; padding: 3px 7px; border-radius: 6px; cursor: pointer; }
+.cm-acts button:hover { background: var(--surface-2); color: var(--ink); }
+.cm-acts button.danger:hover { color: var(--danger); }
+.cm-body { margin-top: 4px; font-size: 14.5px; line-height: 1.65; max-width: 72ch; overflow-wrap: anywhere; }
+.cm-body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.cm-empty { margin: 14px 0; color: var(--muted); font-size: 14px; }
+.cm-new { display: flex; gap: 12px; padding-top: 16px; }
+.cm-new textarea, .cm-edit textarea { resize: none; min-height: 44px; line-height: 1.55; }
+.cm-edit { margin-top: 6px; }
+.cm-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.cm-hint { font-size: 12px; color: var(--muted); }
+@media (max-width: 600px) { .cm-hint { display: none; } }
 </style>
 </head>
 <body>
@@ -940,7 +962,7 @@ window.APP_CONFIG = {
 
   const state = {
     candidates: [], sources: [], folders: [],
-    settings: { calc: normalizeCalc(null), members: [], company: {} }, settingsMeta: {}, orders: [], competitors: [],
+    settings: { calc: normalizeCalc(null), members: [], company: {} }, settingsMeta: {}, orders: [], competitors: [], comments: [],
     status: 'all', q: '', category: '', author: '', sort: 'new',
     tab: ls.get('sb_tab', 'info'),
     expanded: new Set(ls.get('sb_expanded', []))
@@ -1176,17 +1198,18 @@ window.APP_CONFIG = {
      데이터
      ========================================================= */
   async function loadAll() {
-    const [c, s, f, st, od, cp] = await Promise.all([
+    const [c, s, f, st, od, cp, cm] = await Promise.all([
       sb.from('candidates').select('*').order('created_at', { ascending: false }),
       sb.from('sources').select('*').order('created_at', { ascending: true }),
       sb.from('folders').select('*'),
       sb.from('settings').select('*'),
       sb.from('orders').select('*').order('created_at', { ascending: false }),
-      sb.from('competitors').select('*').order('created_at', { ascending: true })
+      sb.from('competitors').select('*').order('created_at', { ascending: true }),
+      sb.from('comments').select('*').order('created_at', { ascending: true })
     ]);
-    const err = c.error || s.error || f.error || st.error || od.error || cp.error;
+    const err = c.error || s.error || f.error || st.error || od.error || cp.error || cm.error;
     if (err) {
-      const needMigrate = /folders|settings|orders|competitors|kind|column|does not exist|schema cache|relation/i.test(err.message);
+      const needMigrate = /folders|settings|orders|competitors|comments|kind|column|does not exist|schema cache|relation/i.test(err.message);
       view.innerHTML = `<div class="empty"><h2>${needMigrate ? '데이터베이스 업데이트가 필요합니다' : '데이터를 불러오지 못했습니다'}</h2>
         <p>${needMigrate ? 'Supabase → SQL Editor에서 새 supabase-schema.sql 내용을 붙여넣고 Run 해주세요. 기존 데이터는 그대로 유지됩니다.' : esc(err.message)}</p>
         <button class="btn" onclick="location.reload()">다시 시도</button></div>`;
@@ -1197,6 +1220,7 @@ window.APP_CONFIG = {
     state.folders = f.data || [];
     state.orders = od.data || [];
     state.competitors = cp.data || [];
+    state.comments = cm.data || [];
     (st.data || []).forEach((r) => {
       state.settings[r.key] = r.value;
       state.settingsMeta[r.key] = { by: r.updated_by, at: r.updated_at };
@@ -1216,6 +1240,7 @@ window.APP_CONFIG = {
 
   const sourcesOf = (id) => state.sources.filter((s) => s.candidate_id === id);
   const competitorsOf = (id) => state.competitors.filter((x) => x.candidate_id === id);
+  const commentsOf = (id) => state.comments.filter((x) => x.candidate_id === id);
   const compTotal = (x) => x.price == null ? null : (x.price || 0) + (x.shipping_fee || 0);
   const coverOf = (c) => (c.images && c.images[0]) || sourcesOf(c.id).flatMap((s) => s.images || [])[0] || null;
   // 도착원가: 위안가에 계산법을 적용한 값. 위안가가 없는 국내 소싱처는 현지원가(단가+배송비)를 그대로 씀
@@ -2527,7 +2552,7 @@ window.APP_CONFIG = {
         </div>
       </header>
       <div class="dtabs" role="tablist">
-        <button role="tab" data-act="tab" data-v="info" aria-selected="${state.tab === 'info'}">요약 · 이미지</button>
+        <button role="tab" data-act="tab" data-v="info" aria-selected="${state.tab === 'info'}">요약 · 이미지${commentsOf(id).length ? `<span class="n" title="댓글">💬 ${commentsOf(id).length}</span>` : ''}</button>
         <button role="tab" data-act="tab" data-v="sources" aria-selected="${state.tab === 'sources'}">소싱처 비교<span class="n">${srcCount}</span></button>
         <button role="tab" data-act="tab" data-v="comp" aria-selected="${state.tab === 'comp'}">경쟁사 비교<span class="n">${compCount}</span></button>
         <button role="tab" data-act="tab" data-v="doc" aria-selected="${state.tab === 'doc'}">📝 문서</button>
@@ -2599,6 +2624,8 @@ window.APP_CONFIG = {
         </section>
       </div>`;
     bindInfoCalc(c);
+    body.insertAdjacentHTML('beforeend', '<section class="comments" id="comments"></section>');
+    renderComments(c);
   }
 
   /** 요약 탭: 원가·계산법을 바꾸면 바로 계산해서 저장 */
@@ -2640,6 +2667,124 @@ window.APP_CONFIG = {
     cnyIn.addEventListener('input', () => { show(); status.textContent = ''; saveSoon(); });
     sel.addEventListener('change', save);
     show();
+  }
+
+  /* =========================================================
+     댓글 (요약 · 이미지 탭 하단)
+     ========================================================= */
+  function commentBodyHTML(text) {
+    // 줄바꿈 유지 + 주소는 클릭 가능한 링크로
+    const tmp = document.createElement('div');
+    String(text || '').split(/\r?\n/).forEach((line, i) => {
+      if (i) tmp.append(document.createElement('br'));
+      tmp.append(document.createTextNode(line));
+    });
+    linkifyNode(tmp);
+    return tmp.innerHTML;
+  }
+
+  function renderComments(c, editId = null) {
+    const box = $('#comments');
+    if (!box) return;
+    const list = commentsOf(c.id);
+    const draftKey = 'sb_cdraft_' + c.id;
+    const draft = ls.get(draftKey, '');
+    box.innerHTML = `
+      <div class="section-head" style="margin-top:32px"><h2>댓글<span>${list.length}개</span></h2></div>
+      <div class="panel cm-panel">
+        ${list.length ? `<ol class="cm-list">${list.map((m) => {
+          const mine = m.author && m.author === me;
+          const edited = m.updated_at && m.created_at && new Date(m.updated_at) - new Date(m.created_at) > 5000;
+          return `<li class="cm" id="cm-${m.id}">
+            ${avatar(m.author || '?')}
+            <div class="cm-main">
+              <div class="cm-meta"><b>${esc(m.author || '알 수 없음')}</b><span title="${esc(new Date(m.created_at).toLocaleString('ko-KR'))}">${ago(m.created_at)}</span>${edited ? '<span>(수정됨)</span>' : ''}
+                ${mine && editId !== m.id ? `<span class="cm-acts"><button type="button" data-cm="edit" data-id="${m.id}">수정</button><button type="button" data-cm="del" data-id="${m.id}" class="danger">삭제</button></span>` : ''}</div>
+              ${editId === m.id ? `
+                <div class="cm-edit">
+                  <textarea rows="3" id="cm-edit-text">${esc(m.body)}</textarea>
+                  <div class="cm-row"><span class="cm-hint">Ctrl+Enter로 저장</span><span class="spacer"></span>
+                    <button type="button" class="btn small" data-cm="cancel">취소</button>
+                    <button type="button" class="btn small primary" data-cm="save" data-id="${m.id}">저장</button></div>
+                </div>` : `<div class="cm-body">${commentBodyHTML(m.body)}</div>`}
+            </div>
+          </li>`;
+        }).join('')}</ol>` : '<p class="cm-empty">아직 댓글이 없습니다. 이 상품에 대한 의견을 남겨 보세요.</p>'}
+        <div class="cm-new">
+          ${me ? avatar(me) : ''}
+          <div class="cm-main">
+            <textarea id="cm-text" rows="2" placeholder="${me ? esc(me) + '(으)로 댓글 남기기' : '댓글 남기기'}">${esc(draft)}</textarea>
+            <div class="cm-row"><span class="cm-hint">Ctrl+Enter로 등록 · 주소는 자동으로 링크가 됩니다</span><span class="spacer"></span>
+              <button type="button" class="btn small primary" data-cm="add">댓글 등록</button></div>
+          </div>
+        </div>
+      </div>`;
+
+    const ta = $('#cm-text');
+    const grow = (t) => { t.style.height = 'auto'; t.style.height = Math.min(320, t.scrollHeight + 2) + 'px'; };
+    ta.addEventListener('input', () => { ls.set(draftKey, ta.value); grow(ta); });
+    ta.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); addComment(c); } });
+    if (draft) grow(ta);
+    const et = $('#cm-edit-text');
+    if (et) {
+      grow(et); et.focus(); et.setSelectionRange(et.value.length, et.value.length);
+      et.addEventListener('input', () => grow(et));
+      et.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveCommentEdit(c, editId); }
+        if (e.key === 'Escape') { e.stopPropagation(); renderComments(c); }
+      });
+    }
+    box.onclick = async (e) => {
+      const b = e.target.closest('[data-cm]'); if (!b) return;
+      const act = b.dataset.cm;
+      if (act === 'add') addComment(c);
+      else if (act === 'edit') renderComments(c, b.dataset.id);
+      else if (act === 'cancel') renderComments(c);
+      else if (act === 'save') saveCommentEdit(c, b.dataset.id);
+      else if (act === 'del') {
+        if (!(await confirmBox('댓글 삭제', '이 댓글을 삭제할까요?'))) return;
+        const { error } = await sb.from('comments').delete().eq('id', b.dataset.id);
+        if (error) { toast('삭제하지 못했습니다: ' + error.message, true); return; }
+        state.comments = state.comments.filter((x) => x.id !== b.dataset.id);
+        renderComments(c);
+        updateCommentTab(c);
+      }
+    };
+  }
+
+  function updateCommentTab(c) {
+    const t = $('.dtabs [data-v=info]');
+    if (!t) return;
+    const n = commentsOf(c.id).length;
+    t.innerHTML = `요약 · 이미지${n ? `<span class="n" title="댓글">💬 ${n}</span>` : ''}`;
+  }
+
+  async function addComment(c) {
+    const ta = $('#cm-text');
+    const body = ta.value.trim();
+    if (!body) { ta.focus(); return; }
+    if (!me) { openWhoPicker(false); return; }
+    const btn = $('#comments [data-cm=add]');
+    btn.disabled = true;
+    const { data, error } = await sb.from('comments').insert({ candidate_id: c.id, author: me, body }).select().single();
+    btn.disabled = false;
+    if (error) { toast('댓글을 등록하지 못했습니다: ' + error.message, true); return; }
+    state.comments.push(data);
+    ls.set('sb_cdraft_' + c.id, '');
+    renderComments(c);
+    updateCommentTab(c);
+    $('#cm-' + data.id)?.scrollIntoView({ block: 'nearest' });
+  }
+
+  async function saveCommentEdit(c, id) {
+    const et = $('#cm-edit-text');
+    const body = et.value.trim();
+    if (!body) { toast('내용을 입력해 주세요.'); return; }
+    const { data, error } = await sb.from('comments').update({ body }).eq('id', id).select().single();
+    if (error) { toast('저장하지 못했습니다: ' + error.message, true); return; }
+    const i = state.comments.findIndex((x) => x.id === id);
+    if (i >= 0) state.comments[i] = data || { ...state.comments[i], body, updated_at: new Date().toISOString() };
+    renderComments(c);
   }
 
   async function renderSourcesTab(c, body) {
