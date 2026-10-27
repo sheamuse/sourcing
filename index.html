@@ -734,6 +734,17 @@ form.po-simple .only-simple { display: block; }
 .menu .pk-grid button { padding: 0; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; }
 .menu .pk-grid button:hover { border-color: var(--accent); }
 .pk-grid img { width: 100%; height: 100%; object-fit: contain; }
+
+/* ===== 문서 링크 ===== */
+.doc-editor a[href] { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.doc-editor a[href]:hover { text-decoration-thickness: 2px; }
+.link-bubble { position: absolute; z-index: 40; display: flex; align-items: center; gap: 4px; max-width: min(460px, calc(100vw - 16px));
+  padding: 4px 4px 4px 10px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 9px; box-shadow: 0 6px 20px rgba(10,14,12,.14); font-size: 12.5px; }
+.link-bubble .lb-url { color: var(--accent); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; margin-right: 4px; }
+.link-bubble .lb-url:hover { text-decoration: underline; }
+.link-bubble button { border: 0; background: transparent; border-radius: 6px; padding: 4px 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.link-bubble button:hover { background: var(--surface-2); }
+.link-bubble button[data-lk=unlink] { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -2313,7 +2324,7 @@ window.APP_CONFIG = {
     renderTree();
     if (scroll) window.scrollTo(0, 0);
   }
-  window.addEventListener('hashchange', () => route(true));
+  window.addEventListener('hashchange', () => { const b = $('#link-bubble'); if (b) b.hidden = true; route(true); });
 
   /* =========================================================
      목록 (전체 / 폴더)
@@ -2880,6 +2891,7 @@ window.APP_CONFIG = {
 
     const ed = $('#doc-editor');
     ed.innerHTML = sanitize(c.doc_html || '');
+    linkifyNode(ed);
     if (!ed.textContent.trim() && !ed.querySelector('img,hr,table')) ed.innerHTML = '';
     await hydrateDocImages(ed);
     docCtx = { id: c.id, rev: c.doc_rev || 0, dirty: false, saving: false, timer: null, el: ed, range: null };
@@ -2889,6 +2901,7 @@ window.APP_CONFIG = {
     ed.addEventListener('input', markDocDirty);
     ed.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); clearTimeout(docCtx?.timer); saveDoc(); }
+      if ((e.key === ' ' || e.key === 'Enter') && !e.isComposing) autoLinkBeforeCaret();
       if (e.key === 'Tab' && !e.isComposing) {
         const cell = currentCell();
         if (cell) { e.preventDefault(); moveCell(cell, e.shiftKey ? -1 : 1); }
@@ -2900,7 +2913,12 @@ window.APP_CONFIG = {
       const li = e.target.closest('ul.checklist > li');
       if (li && e.offsetX < 26) { li.classList.toggle('checked'); markDocDirty(); return; }
       const a = e.target.closest('a[href]');
-      if (a && (e.ctrlKey || e.metaKey)) { e.preventDefault(); window.open(a.href, '_blank', 'noopener'); }
+      // 링크는 한 번 클릭하면 새 탭으로 이동 (글자를 드래그해서 선택 중이거나 Alt를 누른 채 클릭하면 편집)
+      if (a && !e.altKey && getSelection().isCollapsed) {
+        e.preventDefault();
+        window.open(a.href, '_blank', 'noopener');
+        return;
+      }
       const img = e.target.closest('img[data-path]');
       if (img && e.detail === 2) {
         const paths = $$('img[data-path]', ed).map((i) => i.dataset.path);
@@ -2908,6 +2926,8 @@ window.APP_CONFIG = {
       }
     });
     ed.addEventListener('paste', onDocPaste);
+    ed.addEventListener('mouseover', (e) => { const a = e.target.closest('a[href]'); if (a) showLinkBubble(a); });
+    ed.addEventListener('mouseout', (e) => { if (e.target.closest('a[href]')) hideLinkBubbleSoon(); });
     ed.addEventListener('drop', (e) => {
       const files = imageFilesFrom(e.dataTransfer);
       if (!files.length) return;
@@ -3289,12 +3309,141 @@ window.APP_CONFIG = {
     const html = e.clipboardData.getData('text/html');
     if (html) {
       e.preventDefault();
-      const clean = sanitize(html.replace(/<!--StartFragment-->|<!--EndFragment-->/g, ''));
-      document.execCommand('insertHTML', false, clean);
+      const tmp = document.createElement('div');
+      tmp.innerHTML = sanitize(html.replace(/<!--StartFragment-->|<!--EndFragment-->/g, ''));
+      linkifyNode(tmp);
+      document.execCommand('insertHTML', false, tmp.innerHTML);
       markDocDirty();
       importExternalImages();
+      return;
     }
-    // 일반 텍스트는 브라우저 기본 동작
+    // 일반 텍스트에 주소가 있으면 링크로 바꿔서 붙여넣기
+    const text = e.clipboardData.getData('text/plain');
+    if (text && URL_RE().test(text)) {
+      e.preventDefault();
+      const tmp = document.createElement('div');
+      text.split(/\r?\n/).forEach((line, i) => {
+        if (i) tmp.append(document.createElement('br'));
+        tmp.append(document.createTextNode(line));
+      });
+      linkifyNode(tmp);
+      document.execCommand('insertHTML', false, tmp.innerHTML);
+      markDocDirty();
+    }
+  }
+
+  /* ---------- 링크 자동 변환 ---------- */
+  const URL_RE = () => /(https?:\/\/[^\s<>"'`]+|www\.[^\s<>"'`]+\.[^\s<>"'`]+)/gi;
+  function trimUrl(u) {
+    // 문장 끝 마침표·괄호 등은 링크에서 제외
+    let s = u;
+    while (/[.,;:!?'"’”)\]}>…。，、]$/.test(s)) {
+      const ch = s.slice(-1);
+      if (ch === ')' && (s.match(/\(/g) || []).length >= (s.match(/\)/g) || []).length) break;
+      s = s.slice(0, -1);
+    }
+    return s;
+  }
+  function makeLink(url) {
+    const a = document.createElement('a');
+    a.href = normUrl(url);
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = url;
+    return a;
+  }
+  function linkifyNode(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => n.parentElement && n.parentElement.closest('a,code,pre') ? NodeFilter.FILTER_REJECT
+        : URL_RE().test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      const txt = node.nodeValue;
+      const frag = document.createDocumentFragment();
+      let last = 0;
+      txt.replace(URL_RE(), (m, _g, idx) => {
+        const url = trimUrl(m);
+        frag.append(document.createTextNode(txt.slice(last, idx)));
+        frag.append(makeLink(url));
+        last = idx + url.length;
+        return m;
+      });
+      frag.append(document.createTextNode(txt.slice(last)));
+      node.replaceWith(frag);
+    });
+  }
+  function autoLinkBeforeCaret() {
+    const sel = getSelection();
+    if (!sel.rangeCount || !sel.isCollapsed) return;
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== 3 || !docCtx?.el.contains(node) || node.parentElement.closest('a,code,pre')) return;
+    const before = node.nodeValue.slice(0, sel.anchorOffset);
+    const m = /(https?:\/\/\S+|www\.\S+\.\S+)$/i.exec(before);
+    if (!m) return;
+    const url = trimUrl(m[1]);
+    const start = m.index;
+    const r = document.createRange();
+    r.setStart(node, start);
+    r.setEnd(node, start + url.length);
+    const a = makeLink(url);
+    r.deleteContents();
+    r.insertNode(a);
+    // 커서를 링크 바로 뒤로 (이어서 치는 글자가 링크에 들어가지 않게)
+    const after = document.createRange();
+    if (a.nextSibling && a.nextSibling.nodeType === 3) after.setStart(a.nextSibling, 0);
+    else { const t = document.createTextNode(''); a.after(t); after.setStart(t, 0); }
+    after.collapse(true);
+    sel.removeAllRanges(); sel.addRange(after);
+    markDocDirty();
+  }
+
+  /* ---------- 링크 말풍선 (주소 보기 · 수정 · 제거) ---------- */
+  let bubbleTimer = null, bubbleLink = null;
+  function linkBubbleEl() {
+    let b = $('#link-bubble');
+    if (b) return b;
+    b = document.createElement('div');
+    b.id = 'link-bubble';
+    b.className = 'link-bubble';
+    b.hidden = true;
+    b.innerHTML = `<a class="lb-url" target="_blank" rel="noopener noreferrer"></a>
+      <button type="button" data-lk="edit">수정</button><button type="button" data-lk="unlink">링크 제거</button>`;
+    b.addEventListener('mouseenter', () => clearTimeout(bubbleTimer));
+    b.addEventListener('mouseleave', hideLinkBubbleSoon);
+    b.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
+    b.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-lk]');
+      if (!btn || !bubbleLink || !docCtx?.el.contains(bubbleLink)) return;
+      const a = bubbleLink;
+      b.hidden = true;
+      if (btn.dataset.lk === 'unlink') { a.replaceWith(...a.childNodes); markDocDirty(); return; }
+      const u = await askText('링크 수정', '주소', a.getAttribute('href') || '');
+      if (!u || !docCtx?.el.contains(a)) return;
+      const wasUrlText = a.textContent === a.getAttribute('href') || URL_RE().test(a.textContent);
+      a.href = normUrl(u);
+      if (wasUrlText) a.textContent = u;
+      markDocDirty();
+    });
+    document.body.append(b);
+    return b;
+  }
+  function showLinkBubble(a) {
+    clearTimeout(bubbleTimer);
+    const b = linkBubbleEl();
+    bubbleLink = a;
+    const url = b.querySelector('.lb-url');
+    url.href = a.href;
+    url.textContent = a.href.length > 48 ? a.href.slice(0, 46) + '…' : a.href;
+    b.hidden = false;
+    const r = a.getBoundingClientRect();
+    b.style.top = (r.bottom + window.scrollY + 4) + 'px';
+    b.style.left = Math.max(8, Math.min(r.left + window.scrollX, window.innerWidth - b.offsetWidth - 8)) + 'px';
+  }
+  function hideLinkBubbleSoon() {
+    clearTimeout(bubbleTimer);
+    bubbleTimer = setTimeout(() => { const b = $('#link-bubble'); if (b) b.hidden = true; }, 350);
   }
 
   async function insertDocImages(files, atEnd = false) {
