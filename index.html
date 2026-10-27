@@ -2789,7 +2789,10 @@ window.APP_CONFIG = {
         const allowed = ALLOWED[el.tagName] || [];
         for (const a of [...el.attributes]) {
           if (!allowed.includes(a.name)) { el.removeAttribute(a.name); continue; }
-          if (a.name === 'href' && !/^(https?:|mailto:)/i.test(a.value.trim())) el.removeAttribute('href');
+          if (a.name === 'href') {
+            const fixed = fixHref(a.value);
+            if (fixed) el.setAttribute('href', fixed); else el.removeAttribute('href');
+          }
           if (a.name === 'src' && !/^https?:/i.test(a.value.trim())) el.removeAttribute('src');
           if (a.name === 'class') {
             const keep = a.value.split(/\s+/).filter((x) => x === 'checklist' || x === 'checked');
@@ -2797,7 +2800,11 @@ window.APP_CONFIG = {
           }
         }
         if (el.tagName === 'IMG' && !el.getAttribute('data-path') && !el.getAttribute('src')) { el.remove(); continue; }
-        if (el.tagName === 'A') { el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer'); }
+        if (el.tagName === 'A') {
+          // 주소가 없지만 글자가 주소처럼 생겼으면 그 글자를 주소로
+          if (!el.getAttribute('href')) { const t = fixHref(el.textContent); if (t) el.setAttribute('href', t); }
+          el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener noreferrer');
+        }
         walk(el);
       }
     })(root);
@@ -2891,7 +2898,7 @@ window.APP_CONFIG = {
 
     const ed = $('#doc-editor');
     ed.innerHTML = sanitize(c.doc_html || '');
-    linkifyNode(ed);
+    fixLinks(ed);
     if (!ed.textContent.trim() && !ed.querySelector('img,hr,table')) ed.innerHTML = '';
     await hydrateDocImages(ed);
     docCtx = { id: c.id, rev: c.doc_rev || 0, dirty: false, saving: false, timer: null, el: ed, range: null };
@@ -2901,7 +2908,7 @@ window.APP_CONFIG = {
     ed.addEventListener('input', markDocDirty);
     ed.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); clearTimeout(docCtx?.timer); saveDoc(); }
-      if ((e.key === ' ' || e.key === 'Enter') && !e.isComposing) autoLinkBeforeCaret();
+      if ((e.key === ' ' || e.key === 'Enter') && !e.isComposing) { autoLinkBeforeCaret(); if (e.key === 'Enter') setTimeout(fixLinksKeepCaret, 0); }
       if (e.key === 'Tab' && !e.isComposing) {
         const cell = currentCell();
         if (cell) { e.preventDefault(); moveCell(cell, e.shiftKey ? -1 : 1); }
@@ -2916,7 +2923,7 @@ window.APP_CONFIG = {
       // 링크는 한 번 클릭하면 새 탭으로 이동 (글자를 드래그해서 선택 중이거나 Alt를 누른 채 클릭하면 편집)
       if (a && !e.altKey && getSelection().isCollapsed) {
         e.preventDefault();
-        window.open(a.href, '_blank', 'noopener');
+        openUrl(a.href);
         return;
       }
       const img = e.target.closest('img[data-path]');
@@ -3313,6 +3320,7 @@ window.APP_CONFIG = {
       tmp.innerHTML = sanitize(html.replace(/<!--StartFragment-->|<!--EndFragment-->/g, ''));
       linkifyNode(tmp);
       document.execCommand('insertHTML', false, tmp.innerHTML);
+      fixLinksKeepCaret();
       markDocDirty();
       importExternalImages();
       return;
@@ -3328,11 +3336,55 @@ window.APP_CONFIG = {
       });
       linkifyNode(tmp);
       document.execCommand('insertHTML', false, tmp.innerHTML);
+      fixLinksKeepCaret();
       markDocDirty();
+    }
+  }
+  // 편집기 전체 링크를 정리하되 커서 위치는 최대한 유지
+  function fixLinksKeepCaret() {
+    if (!docCtx) return;
+    const ed = docCtx.el;
+    if (!ed.querySelector('a a, a:not([href])')) return;
+    const marker = document.createElement('span');
+    marker.id = '__caret';
+    const sel = getSelection();
+    if (sel.rangeCount && ed.contains(sel.anchorNode)) { const r = sel.getRangeAt(0); r.collapse(false); r.insertNode(marker); }
+    fixLinks(ed);
+    const m = ed.querySelector('#__caret');
+    if (m) {
+      const r = document.createRange(); r.setStartBefore(m); r.collapse(true);
+      m.remove(); sel.removeAllRanges(); sel.addRange(r);
     }
   }
 
   /* ---------- 링크 자동 변환 ---------- */
+  // 붙여넣은 링크 주소 정리: //주소, www.주소, 앞뒤 공백 → https:// 주소. 쓸 수 없는 주소는 null
+  function fixHref(v) {
+    let s = String(v || '').trim();
+    if (!s) return null;
+    if (/^https?:\/\//i.test(s) || /^mailto:/i.test(s)) return s;
+    if (/^\/\//.test(s)) return 'https:' + s;
+    if (/^www\.[^\s]+\.[^\s]+$/i.test(s)) return 'https://' + s;
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+\/[^\s]*$/i.test(s)) return 'https://' + s; // detail.1688.com/offer/...
+    return null;
+  }
+  // 링크 정리: 링크 안의 링크 풀기, 주소 없는 링크는 글자로 되돌린 뒤 주소 글자면 다시 링크로
+  function fixLinks(root) {
+    $$('a a', root).forEach((inner) => { const outer = inner.parentElement.closest('a'); if (outer && outer !== inner) outer.replaceWith(...outer.childNodes); });
+    $$('a', root).forEach((el) => {
+      const h = fixHref(el.getAttribute('href')) || fixHref(el.textContent);
+      if (!h) { el.replaceWith(...el.childNodes); return; }
+      el.setAttribute('href', h); el.target = '_blank'; el.rel = 'noopener noreferrer';
+    });
+    root.normalize();
+    linkifyNode(root);
+  }
+  function openUrl(url) {
+    const t = document.createElement('a');
+    t.href = url; t.target = '_blank'; t.rel = 'noopener noreferrer';
+    t.style.display = 'none';
+    document.body.append(t); t.click(); t.remove();
+  }
   const URL_RE = () => /(https?:\/\/[^\s<>"'`]+|www\.[^\s<>"'`]+\.[^\s<>"'`]+)/gi;
   function trimUrl(u) {
     // 문장 끝 마침표·괄호 등은 링크에서 제외
