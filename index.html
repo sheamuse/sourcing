@@ -767,6 +767,51 @@ form.po-simple .only-simple { display: block; }
 .cm-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .cm-hint { font-size: 12px; color: var(--muted); }
 @media (max-width: 600px) { .cm-hint { display: none; } }
+
+/* ===== 댓글 표시 ===== */
+.cm-badge { display: inline-flex; align-items: center; gap: 4px; flex: none; height: 20px; padding: 0 7px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cm-badge.new { color: #fff; background: var(--accent); border-color: var(--accent); }
+.cm-badge b { font-weight: 800; padding-left: 4px; margin-left: 1px; border-left: 1px solid rgba(255,255,255,.45); }
+.tree-row .cm-badge.compact { height: 18px; padding: 0 6px; font-size: 11px; }
+.tree-row.active .cm-badge:not(.new) { background: var(--surface); }
+.cm-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.card { position: relative; }
+.card-cm { position: absolute; top: 10px; right: 10px; z-index: 1; }
+.card-cm .cm-badge { height: 24px; padding: 0 9px; font-size: 12.5px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.card-cm .cm-badge:not(.new) { background: var(--surface); }
+.card.has-new { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.btn.small.cm-filter { height: 38px; gap: 6px; font-size: 13.5px; }
+.cm-filter.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.cm-filter b { font-size: 11.5px; color: #fff; background: var(--accent); border-radius: 999px; padding: 1px 7px; }
+
+/* ===== 단계 필터 ===== */
+.stage-filters { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.subtabs { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 2px; }
+.subtabs button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 11px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.subtabs button:hover { border-color: var(--line-strong); color: var(--ink); }
+.subtabs button[aria-selected=true] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.subtabs .count { font-size: 11.5px; font-weight: 500; opacity: .8; font-variant-numeric: tabular-nums; }
+.s-selling { color: #0B5C8A; background: #DCEFFA; }
+@media (prefers-color-scheme: dark) { .s-selling { color: #8FD0F5; background: #12324A; } }
+
+/* ===== 샘플 발주서 선택 ===== */
+.it-url { margin-top: 4px; font-size: 12px !important; padding: 5px 8px !important; color: var(--muted); }
+.card.pickable { cursor: pointer; }
+.card.pickable .pick { position: absolute; z-index: 2; top: 10px; left: 10px; width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+  background: var(--surface); border: 2px solid var(--line-strong); color: transparent; font-weight: 800; font-size: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.card.pickable:hover .pick { border-color: var(--accent); }
+.card.picked { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.card.picked .pick { background: var(--accent); border-color: var(--accent); color: #fff; }
+.card.pickable:hover h3 { text-decoration: none; }
+.selbar { position: fixed; z-index: 30; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(900px, calc(100vw - 24px));
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; background: var(--surface);
+  border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: 0 12px 36px rgba(10,14,12,.2); }
+.sb-title { font-weight: 800; font-size: 14px; }
+.sb-count { font-size: 13.5px; color: var(--muted); }
+.sb-count b { color: var(--accent); }
+body.selecting .view { padding-bottom: 120px; }
+.order-names { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px; }
 </style>
 </head>
 <body>
@@ -963,7 +1008,8 @@ window.APP_CONFIG = {
   const state = {
     candidates: [], sources: [], folders: [],
     settings: { calc: normalizeCalc(null), members: [], company: {} }, settingsMeta: {}, orders: [], competitors: [], comments: [],
-    status: 'all', q: '', category: '', author: '', sort: 'new',
+    status: 'all', stage: ls.get('sb_stage', 'all'), q: '', category: '', author: '', sort: 'new', onlyComments: false,
+    selecting: false, selected: new Set(),
     tab: ls.get('sb_tab', 'info'),
     expanded: new Set(ls.get('sb_expanded', []))
   };
@@ -1209,7 +1255,7 @@ window.APP_CONFIG = {
     ]);
     const err = c.error || s.error || f.error || st.error || od.error || cp.error || cm.error;
     if (err) {
-      const needMigrate = /folders|settings|orders|competitors|comments|kind|column|does not exist|schema cache|relation/i.test(err.message);
+      const needMigrate = /folders|settings|orders|competitors|comments|stage|candidate_ids|kind|column|does not exist|schema cache|relation/i.test(err.message);
       view.innerHTML = `<div class="empty"><h2>${needMigrate ? '데이터베이스 업데이트가 필요합니다' : '데이터를 불러오지 못했습니다'}</h2>
         <p>${needMigrate ? 'Supabase → SQL Editor에서 새 supabase-schema.sql 내용을 붙여넣고 Run 해주세요. 기존 데이터는 그대로 유지됩니다.' : esc(err.message)}</p>
         <button class="btn" onclick="location.reload()">다시 시도</button></div>`;
@@ -1241,6 +1287,48 @@ window.APP_CONFIG = {
   const sourcesOf = (id) => state.sources.filter((s) => s.candidate_id === id);
   const competitorsOf = (id) => state.competitors.filter((x) => x.candidate_id === id);
   const commentsOf = (id) => state.comments.filter((x) => x.candidate_id === id);
+  // 단계: 샘플링(검토중·선정·보류·탈락) / 판매중
+  const stageOf = (c) => (c.stage === 'selling' ? 'selling' : 'sampling');
+  const statusLabel = (c) => (stageOf(c) === 'selling' ? '판매중' : `샘플링 · ${c.status}`);
+  const statusPill = (c) => stageOf(c) === 'selling'
+    ? '<span class="pill s-selling">판매중</span>'
+    : `<span class="pill s-${STATUS_KEY[c.status]}">${esc(c.status)}</span>`;
+  const stageValue = (c) => (stageOf(c) === 'selling' ? 'selling' : 'sampling|' + (c?.status || '검토중'));
+  const stageOptions = (c) => `
+    <optgroup label="샘플링">${STATUSES.map((s) => `<option value="sampling|${s}" ${c && stageValue(c) === 'sampling|' + s ? 'selected' : (!c && s === '검토중' ? 'selected' : '')}>샘플링 · ${s}</option>`).join('')}</optgroup>
+    <optgroup label="판매"><option value="selling" ${c && stageOf(c) === 'selling' ? 'selected' : ''}>판매중</option></optgroup>`;
+  function parseStage(v, prevStatus) {
+    if (v === 'selling') return { stage: 'selling', status: prevStatus || '선정' };
+    const [, s] = String(v).split('|');
+    return { stage: 'sampling', status: STATUSES.includes(s) ? s : '검토중' };
+  }
+  // 댓글 읽음 표시: 사람마다(이 기기 기준) 항목을 마지막으로 본 시각을 기억
+  const seenKey = () => 'sb_seen_' + (me || '_');
+  const seenMap = () => ls.get(seenKey(), {});
+  function commentInfo(id) {
+    const list = commentsOf(id);
+    if (!list.length) return null;
+    const seen = seenMap()[id];
+    const unread = list.filter((m) => m.author !== me && (!seen || String(m.created_at) > seen)).length;
+    const last = list.reduce((x, y) => (String(y.created_at) > String(x.created_at) ? y : x));
+    return { count: list.length, unread, last };
+  }
+  function markCommentsSeen(id) {
+    const m = seenMap();
+    const list = commentsOf(id);
+    const latest = list.length ? list.reduce((x, y) => (String(y.created_at) > String(x.created_at) ? y : x)).created_at : null;
+    const stamp = latest && String(latest) > new Date().toISOString() ? String(latest) : new Date().toISOString();
+    if (m[id] && m[id] >= stamp) return false;
+    m[id] = stamp;
+    ls.set(seenKey(), m);
+    return true;
+  }
+  function commentBadge(id, compact = false) {
+    const ci = commentInfo(id);
+    if (!ci) return '';
+    const tip = `댓글 ${ci.count}개${ci.unread ? ` · 새 댓글 ${ci.unread}개` : ''} · 마지막 ${ci.last.author || ''} ${ago(ci.last.created_at)}`;
+    return `<span class="cm-badge ${ci.unread ? 'new' : ''} ${compact ? 'compact' : ''}" title="${esc(tip)}">💬 ${ci.count}${ci.unread && !compact ? `<b>새 ${ci.unread}</b>` : ''}</span>`;
+  }
   const compTotal = (x) => x.price == null ? null : (x.price || 0) + (x.shipping_fee || 0);
   const coverOf = (c) => (c.images && c.images[0]) || sourcesOf(c.id).flatMap((s) => s.images || [])[0] || null;
   // 도착원가: 위안가에 계산법을 적용한 값. 위안가가 없는 국내 소싱처는 현지원가(단가+배송비)를 그대로 씀
@@ -1737,6 +1825,7 @@ window.APP_CONFIG = {
         <span class="twisty blank"></span>
         <span class="ico">${esc(c.emoji || (c.kind === 'doc' ? '📝' : '📦'))}</span>
         <a class="name" href="#/c/${c.id}" title="${esc(c.title)}${c.created_by ? ' · ' + esc(c.created_by) : ''}">${esc(c.title)}</a>
+        ${commentBadge(c.id, true)}
         <button class="kebab" data-act="tree-menu" aria-label="메뉴">⋮</button>
       </div>`;
     const walk = (pid, depth) => {
@@ -1749,6 +1838,7 @@ window.APP_CONFIG = {
             <button class="twisty ${open ? 'open' : ''} ${hasKids ? '' : 'blank'}" data-act="toggle-folder" aria-label="${open ? '접기' : '펼치기'}">▶</button>
             <span class="ico">${esc(f.emoji || '📁')}</span>
             <a class="name" href="#/f/${f.id}">${esc(f.name)}</a>
+            ${itemsUnder(f.id).some((x) => commentInfo(x.id)?.unread) ? '<span class="cm-dot" title="새 댓글이 있는 항목이 있습니다"></span>' : ''}
             <span class="count">${itemsUnder(f.id).length || ''}</span>
             <button class="kebab" data-act="tree-menu" aria-label="메뉴">⋮</button>
           </div>`;
@@ -2344,8 +2434,10 @@ window.APP_CONFIG = {
       docCtx = null;
     }
     const id = currentDetailId();
+    if (id && state.selecting) { state.selecting = false; state.selected.clear(); }
     if (id) await renderDetail(id);
     else renderList(currentFolderId());
+    renderSelBar();
     renderTree();
     if (scroll) window.scrollTo(0, 0);
   }
@@ -2361,7 +2453,9 @@ window.APP_CONFIG = {
       return;
     }
     const scope = (folder ? itemsUnder(folder.id) : state.candidates).filter((c) => c.kind !== 'doc');
-    const counts = Object.fromEntries(STATUSES.map((s) => [s, scope.filter((c) => c.status === s).length]));
+    const sampling = scope.filter((c) => stageOf(c) === 'sampling');
+    const selling = scope.filter((c) => stageOf(c) === 'selling');
+    const counts = Object.fromEntries(STATUSES.map((s) => [s, sampling.filter((c) => c.status === s).length]));
     const cats = [...new Set(scope.map((c) => c.category).filter(Boolean))].sort();
     const authors = [...new Set(scope.map((c) => c.created_by).filter(Boolean))].sort();
     if (state.category && !cats.includes(state.category)) state.category = '';
@@ -2373,22 +2467,29 @@ window.APP_CONFIG = {
       <section class="list-head">
         <div>
           <h1>${folder ? `<span class="folder-emoji">${esc(folder.emoji || '📁')}</span>${esc(folder.name)}` : '신상품 후보'}</h1>
-          <p>후보 ${scope.length}개 중 ${counts['선정']}개 선정${folder?.created_by ? ` · ${esc(folder.created_by)}님이 만든 폴더` : ''}</p>
+          <p>후보 ${scope.length}개 · 샘플링 ${sampling.length}개 (선정 ${counts['선정']}개) · 판매중 ${selling.length}개${folder?.created_by ? ` · ${esc(folder.created_by)}님이 만든 폴더` : ''}</p>
         </div>
         <div class="list-actions">
           ${folder ? `<button class="btn" data-act="new-subfolder">하위 폴더</button>` : ''}
           <button class="btn" data-act="new-doc">새 문서</button>
+          <button class="btn" data-act="select-mode">🧾 샘플 발주서</button>
           <button class="btn primary" data-act="new-candidate">${folder ? '이 폴더에 후보 추가' : '후보 추가'}</button>
         </div>
       </section>
       <div class="toolbar">
-        <div class="tabs" role="tablist">
-          ${['all', ...STATUSES].map((s) => `
-            <button role="tab" aria-selected="${state.status === s}" data-act="filter-status" data-v="${s}">
-              ${s === 'all' ? '전체' : s}<span class="count">${s === 'all' ? scope.length : counts[s]}</span>
-            </button>`).join('')}
+        <div class="stage-filters">
+          <div class="tabs" role="tablist" aria-label="단계">
+            ${[['all', '전체', scope.length], ['sampling', '샘플링', sampling.length], ['selling', '판매중', selling.length]].map(([k, label, n]) => `
+              <button role="tab" aria-selected="${state.stage === k}" data-act="filter-stage" data-v="${k}">${label}<span class="count">${n}</span></button>`).join('')}
+          </div>
+          ${state.stage === 'sampling' ? `
+          <div class="subtabs" role="tablist" aria-label="샘플링 상태">
+            ${['all', ...STATUSES].map((s) => `
+              <button role="tab" aria-selected="${state.status === s}" data-act="filter-status" data-v="${s}">${s === 'all' ? '샘플링 전체' : s}<span class="count">${s === 'all' ? sampling.length : counts[s]}</span></button>`).join('')}
+          </div>` : ''}
         </div>
         <div class="filters">
+          <button type="button" class="btn small cm-filter ${state.onlyComments ? 'on' : ''}" data-act="only-comments" aria-pressed="${state.onlyComments}">💬 댓글 있는 항목${(() => { const u = scope.filter((x) => commentInfo(x.id)?.unread).length; return u ? `<b>새 ${u}</b>` : ''; })()}</button>
           <input type="search" id="q" placeholder="상품명, 이유, 문서 내용 검색" value="${esc(state.q)}" aria-label="검색">
           <select id="author" aria-label="작성자">
             <option value="">모든 작성자</option>
@@ -2401,12 +2502,14 @@ window.APP_CONFIG = {
           <select id="sort" aria-label="정렬">
             <option value="new" ${state.sort === 'new' ? 'selected' : ''}>최근 추가순</option>
             <option value="updated" ${state.sort === 'updated' ? 'selected' : ''}>최근 수정순</option>
+            <option value="comment" ${state.sort === 'comment' ? 'selected' : ''}>최근 댓글순</option>
             <option value="priority" ${state.sort === 'priority' ? 'selected' : ''}>우선순위순</option>
           </select>
         </div>
       </div>
       <div id="grid"></div>
-      <div id="doclist"></div>`;
+      <div id="doclist"></div>
+      <div id="samplelist"></div>`;
 
     $('#q').addEventListener('input', debounce((e) => { state.q = e.target.value; renderGrid(); }, 150));
     $('#author').addEventListener('change', (e) => { state.author = e.target.value; renderGrid(); });
@@ -2423,14 +2526,18 @@ window.APP_CONFIG = {
     const scope = all.filter((c) => c.kind !== 'doc');
     const q = state.q.trim().toLowerCase();
     renderDocList(all.filter((c) => c.kind === 'doc'), q);
+    renderSampleList();
     let list = scope.filter((c) =>
-      (state.status === 'all' || c.status === state.status) &&
+      (state.stage === 'all' || stageOf(c) === state.stage) &&
+      (state.stage !== 'sampling' || state.status === 'all' || c.status === state.status) &&
       (!state.category || c.category === state.category) &&
       (!state.author || c.created_by === state.author) &&
+      (!state.onlyComments || commentsOf(c.id).length > 0) &&
       (!q || [c.title, c.category, c.reason, c.memo, c.target_customer, stripTags(c.doc_html)].join(' ').toLowerCase().includes(q)));
 
     if (state.sort === 'new') list = [...list].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     if (state.sort === 'updated') list = [...list].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
+    if (state.sort === 'comment') list = [...list].sort((a, b) => String(commentInfo(b.id)?.last.created_at || '').localeCompare(String(commentInfo(a.id)?.last.created_at || '')));
     if (state.sort === 'priority') list = [...list].sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority) || String(b.created_at).localeCompare(String(a.created_at)));
 
     const grid = $('#grid');
@@ -2451,6 +2558,9 @@ window.APP_CONFIG = {
     }
     await ensureUrls(list.map(coverOf));
     grid.innerHTML = `<div class="grid">${list.map(cardHTML).join('')}</div>`;
+    grid.dataset.visible = list.map((x) => x.id).join(',');
+    renderSampleList();
+    renderSelBar();
   }
 
   function renderDocList(docs, q) {
@@ -2474,6 +2584,65 @@ window.APP_CONFIG = {
       </div>` : '';
   }
 
+  document.addEventListener('click', (e) => {
+    if (!state.selecting) return;
+    const card = e.target.closest('#grid .card[data-cid]');
+    if (!card) return;
+    e.preventDefault();
+    const id = card.dataset.cid;
+    if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id);
+    card.classList.toggle('picked', state.selected.has(id));
+    renderSelBar();
+  }, true);
+
+  function renderSelBar() {
+    let bar = $('#selbar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'selbar'; bar.className = 'selbar'; bar.hidden = true;
+      document.body.append(bar);
+    }
+    if (!state.selecting || currentDetailId()) { bar.hidden = true; document.body.classList.remove('selecting'); return; }
+    document.body.classList.add('selecting');
+    const n = state.selected.size;
+    bar.hidden = false;
+    bar.innerHTML = `
+      <span class="sb-title">🧾 샘플 발주서</span>
+      <span class="sb-count">${n ? `<b>${n}개</b> 선택됨` : '발주할 후보를 눌러서 고르세요'}</span>
+      <span class="spacer"></span>
+      <button type="button" class="btn small ghost" data-act="sel-all">보이는 후보 모두 선택</button>
+      ${n ? '<button type="button" class="btn small ghost" data-act="sel-none">선택 해제</button>' : ''}
+      <button type="button" class="btn small" data-act="sel-cancel">취소</button>
+      <button type="button" class="btn small primary" data-act="sel-make" ${n ? '' : 'disabled'}>선택한 ${n || ''}개로 발주서 만들기</button>`;
+  }
+
+  function renderSampleList() {
+    const box = $('#samplelist');
+    if (!box) return;
+    const fid = currentFolderId();
+    const inScope = fid ? new Set(itemsUnder(fid).map((x) => x.id)) : null;
+    const list = state.orders.filter((o) => isSampleOrder(o) && (!inScope || (o.candidate_ids || []).some((id) => inScope.has(id))));
+    box.innerHTML = list.length ? `
+      <div class="section-head" style="margin-top:36px"><h2>샘플 발주서<span>${list.length}건</span></h2></div>
+      <div class="orders panel">
+        ${list.map((o) => {
+          const d = o.data || {};
+          const t = orderTotals(d);
+          const names = (o.candidate_ids || []).map((id) => state.candidates.find((x) => x.id === id)?.title).filter(Boolean);
+          return `<div class="order-row">
+            <b>${esc(o.po_number)}</b><span class="pill s-selling">${(d.items || []).length}개 품목</span>${d.form_type === 'simple' ? '<span class="pill s-hold">간이</span>' : ''}
+            <span class="order-names" title="${esc(names.join(', '))}">${esc(names.slice(0, 3).join(', '))}${names.length > 3 ? ` 외 ${names.length - 3}개` : ''}</span>
+            <span class="num">${moneyOf(d.currency)(t.total)}</span>
+            <span class="muted">${o.created_by ? whoHTML(o.created_by, '· ' + ago(o.created_at)) : ago(o.created_at)}</span>
+            <span class="spacer"></span>
+            <button class="btn small ghost" data-act="edit-order" data-id="${o.id}">열기</button>
+            <button class="btn small" data-act="pdf-order" data-id="${o.id}">PDF</button>
+            <button class="btn small ghost danger" data-act="delete-order" data-id="${o.id}" aria-label="삭제">✕</button>
+          </div>`;
+        }).join('')}
+      </div>` : '';
+  }
+
   function cardHTML(c) {
     const cover = coverOf(c);
     const n = sourcesOf(c.id).length;
@@ -2481,11 +2650,13 @@ window.APP_CONFIG = {
     const folder = c.folder_id ? folderById(c.folder_id) : null;
     const excerpt = c.reason || stripTags(c.doc_html).replace(/\s+/g, ' ').trim() || '아직 정리된 내용이 없습니다.';
     return `
-      <a class="card" href="#/c/${c.id}">
+      <a class="card ${commentInfo(c.id)?.unread ? 'has-new' : ''} ${state.selecting ? 'pickable' : ''} ${state.selected.has(c.id) ? 'picked' : ''}" href="#/c/${c.id}" data-cid="${c.id}">
+        ${state.selecting ? `<span class="pick" aria-hidden="true">✓</span>` : ''}
+        ${commentInfo(c.id) ? `<div class="card-cm">${commentBadge(c.id)}</div>` : ''}
         <div class="thumb">${cover && imgUrl(cover) ? `<img src="${esc(imgUrl(cover))}" alt="" loading="lazy">` : `<span class="noimg" style="font-size:34px">${esc(c.emoji || '📄')}</span>`}</div>
         <div class="card-body">
           <div class="meta">
-            <span class="pill s-${STATUS_KEY[c.status]}">${esc(c.status)}</span>
+            ${statusPill(c)}
             ${c.priority === '높음' ? '<span class="prio">우선</span>' : ''}
             ${c.category ? `<span>${esc(c.category)}</span>` : ''}
             ${folder ? `<span>${esc(folder.emoji || '📁')} ${esc(folder.name)}</span>` : ''}
@@ -2493,7 +2664,7 @@ window.APP_CONFIG = {
           <h3>${c.emoji ? esc(c.emoji) + ' ' : ''}${esc(c.title)}</h3>
           <p class="excerpt">${esc(excerpt)}</p>
           <div class="card-foot">
-            <span>${c.created_by ? whoHTML(c.created_by, '· ' + ago(c.created_at)) : '소싱처 ' + n + '곳'}</span>
+            <span>${c.created_by ? whoHTML(c.created_by, '· ' + ago(c.created_at)) : ''}</span>
             ${best ? `<span>${best.chosen ? '선택 도착원가' : '최저 도착원가'} <strong>${won(best.cost)}</strong></span>` : n ? `<span>소싱처 ${n}곳</span>` : ''}
           </div>
         </div>
@@ -2532,7 +2703,7 @@ window.APP_CONFIG = {
       <header class="detail-head">
         <div>
           <div class="meta">
-            <span class="pill s-${STATUS_KEY[c.status]}">${esc(c.status)}</span>
+            ${statusPill(c)}
             ${c.category ? `<span>${esc(c.category)}</span>` : ''}
             <span>우선순위 ${esc(c.priority)}</span>
           </div>
@@ -2543,9 +2714,7 @@ window.APP_CONFIG = {
           </div>
         </div>
         <div class="head-actions">
-          <select data-act="quick-status" aria-label="상태 바꾸기">
-            ${STATUSES.map((s) => `<option ${s === c.status ? 'selected' : ''}>${s}</option>`).join('')}
-          </select>
+          <select data-act="quick-status" aria-label="단계 · 상태 바꾸기">${stageOptions(c)}</select>
           <button class="btn" data-act="edit-candidate">정보 수정</button>
           <button class="btn" data-act="export-menu">🖨️ PDF · 발주서</button>
           <button class="btn ghost" data-act="item-more" aria-label="더보기">⋯</button>
@@ -2686,6 +2855,7 @@ window.APP_CONFIG = {
   function renderComments(c, editId = null) {
     const box = $('#comments');
     if (!box) return;
+    if (markCommentsSeen(c.id)) renderTree();
     const list = commentsOf(c.id);
     const draftKey = 'sb_cdraft_' + c.id;
     const draft = ls.get(draftKey, '');
@@ -3838,7 +4008,7 @@ window.APP_CONFIG = {
             <label>폴더 <select name="folder_id">${folderOptions(fid)}</select></label>
           </div>
           <div class="row3">
-            <label>상태 <select name="status">${STATUSES.map((s) => `<option ${s === (c?.status || '검토중') ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+            <label>단계 · 상태 <select name="stage_status">${stageOptions(c)}</select></label>
             <label>우선순위 <select name="priority">${PRIORITIES.map((s) => `<option ${s === (c?.priority || '보통') ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
             <label>카테고리 <input name="category" list="cat-list" value="${v('category')}" placeholder="예: 반려용품">
               <datalist id="cat-list">${cats.map((x) => `<option value="${esc(x)}">`).join('')}</datalist></label>
@@ -3867,7 +4037,7 @@ window.APP_CONFIG = {
       const p = price.payload();
       const payload = {
         title: f.title.trim(), emoji: f.emoji || null, folder_id: f.folder_id || null,
-        category: f.category.trim() || null, status: f.status, priority: f.priority,
+        category: f.category.trim() || null, ...parseStage(f.stage_status, c?.status), priority: f.priority,
         target_price: numOrNull(f.target_price), reason: f.reason || null, target_customer: f.target_customer || null,
         risks: f.risks || null, memo: f.memo || null, images,
         cny_price: p.cny_price, applied_rate: p.applied_rate, applied_formula: p.applied_formula, applied_text: p.applied_text
@@ -4307,7 +4477,8 @@ window.APP_CONFIG = {
       }
       case 'edit-order': {
         const o = state.orders.find((x) => x.id === el.dataset.id);
-        if (o && c) openOrderForm(c, state.sources.find((x) => x.id === o.source_id), o);
+        if (o && isSampleOrder(o)) openOrderForm(null, null, o);
+        else if (o) openOrderForm(c || state.candidates.find((x) => x.id === o.candidate_id), state.sources.find((x) => x.id === o.source_id), o);
         break;
       }
       case 'pdf-order': {
@@ -4329,10 +4500,38 @@ window.APP_CONFIG = {
       case 'copy-final':
         navigator.clipboard?.writeText(String(el.dataset.v)).then(() => toast(`${fmtNum(el.dataset.v, 0)} 을(를) 복사했습니다.`));
         break;
+      case 'select-mode':
+        state.selecting = true; state.selected.clear();
+        renderGrid();
+        toast('발주서에 넣을 후보를 눌러서 고르세요.');
+        break;
+      case 'sel-all':
+        ($('#grid')?.dataset.visible || '').split(',').filter(Boolean).forEach((id) => state.selected.add(id));
+        renderGrid();
+        break;
+      case 'sel-none': state.selected.clear(); renderGrid(); break;
+      case 'sel-cancel': state.selecting = false; state.selected.clear(); renderGrid(); break;
+      case 'sel-make': {
+        const cands = [...state.selected].map((id) => state.candidates.find((x) => x.id === id)).filter(Boolean);
+        if (!cands.length) break;
+        openOrderForm(null, null, null, null, { multi: cands });
+        break;
+      }
+      case 'only-comments':
+        state.onlyComments = !state.onlyComments;
+        el.classList.toggle('on', state.onlyComments);
+        el.setAttribute('aria-pressed', String(state.onlyComments));
+        renderGrid();
+        break;
       case 'filter-status':
         state.status = el.dataset.v;
-        $$('.tabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.v === state.status));
+        $$('.subtabs button').forEach((b) => b.setAttribute('aria-selected', b.dataset.v === state.status));
         renderGrid();
+        break;
+      case 'filter-stage':
+        state.stage = el.dataset.v; ls.set('sb_stage', state.stage);
+        if (state.stage !== 'sampling') state.status = 'all';
+        renderList(currentFolderId());
         break;
       case 'new-candidate': openCandidateForm(null, { folderId: currentFolderId() }); break;
       case 'new-subfolder': newFolder(currentFolderId()); break;
@@ -4401,17 +4600,20 @@ window.APP_CONFIG = {
   document.addEventListener('change', async (e) => {
     if (e.target.dataset.act !== 'quick-status') return;
     const id = currentDetailId();
-    const status = e.target.value;
-    await flushDoc();
-    const { error } = await sb.from('candidates').update({ status, ...stampUpd() }).eq('id', id);
-    if (error) { toast('상태를 바꾸지 못했습니다: ' + error.message, true); return; }
     const c = state.candidates.find((x) => x.id === id);
-    if (c) { c.status = status; c.updated_by = me; c.updated_at = new Date().toISOString(); }
-    toast(`상태를 '${status}'(으)로 바꿨습니다.`);
+    const patch = parseStage(e.target.value, c?.status);
+    await flushDoc();
+    const { error } = await sb.from('candidates').update({ ...patch, ...stampUpd() }).eq('id', id);
+    if (error) {
+      toast(/stage/.test(error.message) ? '데이터베이스 업데이트가 필요합니다. 새 supabase-schema.sql을 실행해 주세요.' : '상태를 바꾸지 못했습니다: ' + error.message, true);
+      return;
+    }
+    if (c) Object.assign(c, patch, { updated_by: me, updated_at: new Date().toISOString() });
+    toast(`'${statusLabel(c || patch)}'(으)로 바꿨습니다.`);
     if (docCtx) {
       // 문서 편집 중에는 편집기를 다시 그리지 않고 표시만 바꿈
       const pill = $('.detail-head .pill');
-      if (pill) { pill.className = `pill s-${STATUS_KEY[status]}`; pill.textContent = status; }
+      if (pill && c) pill.outerHTML = statusPill(c);
     } else await renderDetail(id);
   });
 
@@ -4510,6 +4712,7 @@ window.APP_CONFIG = {
     .po-items th,.po-items td{border:1px solid #9aa39f;padding:7px 8px;font-size:12px;vertical-align:middle;line-height:1.5}
     .pdf-root .brk{word-break:break-all;overflow-wrap:break-word}
     .po-items td.po-pic{padding:4px;text-align:center}
+    .po-url{font-size:9.5px;color:#55605b;margin-top:3px;line-height:1.35}
     .po-items td.po-pic img{width:72px;height:72px;object-fit:contain;display:inline-block;background:#fff;border-radius:3px}
     .po-simple-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:10px;border-bottom:2px solid #17201d}
     .po-simple-head h1{font-size:22px;letter-spacing:.15em;margin:0}
@@ -4568,13 +4771,16 @@ window.APP_CONFIG = {
         if (img.decode) await img.decode().catch(() => {});
       } catch { img.remove(); }
     }));
+    // 화면이 아래로 스크롤된 상태면 PDF 내용이 잘리므로, 잠깐 맨 위로 올렸다가 되돌림
+    const keepX = window.scrollX, keepY = window.scrollY;
     try {
       await loadScript(H2P_SRC);
+      window.scrollTo(0, 0);
       await window.html2pdf().set({
         margin: [12, 12, 14, 12],
         filename: safeName(filename) + '.pdf',
         image: { type: 'jpeg', quality: 0.94 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false },
+        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'img', '.pdf-avoid'] }
       }).from(root).save();
@@ -4584,6 +4790,7 @@ window.APP_CONFIG = {
       printFallback(root.innerHTML, filename);
     } finally {
       holder.remove();
+      window.scrollTo(keepX, keepY);
     }
   }
 
@@ -4621,7 +4828,7 @@ window.APP_CONFIG = {
     const html = `
       <div class="pdf-kicker"><span>신상품 후보 요약</span><span>${fmtDate(Date.now())} · ${esc(me || '')} 출력</span></div>
       <h1>${c.emoji ? esc(c.emoji) + ' ' : ''}${esc(c.title)}</h1>
-      <div class="pdf-meta">상태 ${esc(c.status)} · 우선순위 ${esc(c.priority)}${c.category ? ' · ' + esc(c.category) : ''}${folder ? ' · 폴더 ' + esc(folder.name) : ''}
+      <div class="pdf-meta">${esc(statusLabel(c))} · 우선순위 ${esc(c.priority)}${c.category ? ' · ' + esc(c.category) : ''}${folder ? ' · 폴더 ' + esc(folder.name) : ''}
         ${c.created_by ? `<br>${esc(c.created_by)} 등록 (${fmtDate(c.created_at)})` : ''}${c.updated_by ? ` · ${esc(c.updated_by)} 최종 수정 (${fmtDate(c.updated_at)})` : ''}</div>
       <div class="pdf-facts pdf-avoid">
         <div><span>목표 판매가</span><b>${won(c.target_price)}</b></div>
@@ -4714,9 +4921,10 @@ window.APP_CONFIG = {
     return srcs.find((s) => s.is_selected) || finalSourceOf(c).s || null;
   }
 
-  function nextPoNumber() {
+  const isSampleOrder = (o) => o.kind === 'sample' || o.data?.kind === 'sample';
+  function nextPoNumber(head = 'PO') {
     const d = new Date();
-    const prefix = `PO-${String(d.getFullYear() % 100).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-`;
+    const prefix = `${head}-${String(d.getFullYear() % 100).padStart(2, '0')}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-`;
     const used = state.orders.map((o) => o.po_number).filter((n) => n && n.startsWith(prefix)).map((n) => +n.slice(prefix.length) || 0);
     return prefix + String((used.length ? Math.max(...used) : 0) + 1).padStart(2, '0');
   }
@@ -4729,7 +4937,7 @@ window.APP_CONFIG = {
   const moneyOf = (cur) => cur === 'CNY' ? (n) => '¥' + fmtNum(n, 2) : (n) => fmtNum(Math.round(n), 0) + '원';
 
   function ordersHTML(c) {
-    const list = state.orders.filter((o) => o.candidate_id === c.id);
+    const list = state.orders.filter((o) => o.candidate_id === c.id || (o.candidate_ids || []).includes(c.id));
     if (!list.length) return '';
     return `
       <div class="orders panel">
@@ -4738,7 +4946,7 @@ window.APP_CONFIG = {
           const d = o.data || {};
           const t = orderTotals(d);
           return `<div class="order-row">
-            <b>${esc(o.po_number)}</b>${d.form_type === 'simple' ? '<span class="pill s-hold">간이</span>' : ''}
+            <b>${esc(o.po_number)}</b>${isSampleOrder(o) ? `<span class="pill s-selling">샘플 ${(o.candidate_ids || []).length}개</span>` : ''}${d.form_type === 'simple' ? '<span class="pill s-hold">간이</span>' : ''}
             <span>${esc(d.supplier?.name || '')}</span>
             <span class="num">${moneyOf(d.currency)(t.total)}</span>
             <span class="muted">${o.created_by ? whoHTML(o.created_by, '· ' + ago(o.created_at)) : ago(o.created_at)}</span>
@@ -4751,10 +4959,30 @@ window.APP_CONFIG = {
       </div>`;
   }
 
-  function openOrderForm(c, s, order, type) {
+  function openOrderForm(c, s, order, type, opts = {}) {
     const co = state.settings.company || {};
-    const cur0 = s && s.cny_price != null ? 'CNY' : 'KRW';
-    const d = order ? JSON.parse(JSON.stringify(order.data || {})) : {
+    // 여러 상품을 묶은 샘플 발주서
+    const multi = !!(opts.multi || (order && isSampleOrder(order)));
+    const multiCands = opts.multi || (multi ? (order.candidate_ids || []).map((id) => state.candidates.find((x) => x.id === id)).filter(Boolean) : []);
+    const multiSrcs = multiCands.map((mc) => ({ c: mc, s: pickOrderSource(mc) }));
+    const cur0 = multi ? (multiSrcs.some((x) => x.s?.cny_price != null) ? 'CNY' : 'KRW') : (s && s.cny_price != null ? 'CNY' : 'KRW');
+    const sites = [...new Set(multiSrcs.map((x) => x.s?.site).filter(Boolean))];
+    const d = order ? JSON.parse(JSON.stringify(order.data || {})) : multi ? {
+      kind: 'sample',
+      lang: ls.get('sb_po_lang', 'kozh'),
+      form_type: type || ls.get('sb_po_type', 'simple'),
+      number: nextPoNumber('SP'), date: today(), due: '',
+      currency: cur0,
+      supplier: { name: sites.length === 1 ? sites[0] : (sites.length ? '여러 공급처 (' + sites.join(', ') + ')' : ''), contact: '', phone: '', url: '' },
+      buyer: { name: co.name || '', contact: co.contact || me || '', phone: co.phone || '', address: co.address || '', biz: co.biz || '' },
+      ship_to: co.ship_to || co.address || '', payment: co.payment || '', shipping: 0, note: '',
+      items: multiSrcs.map(({ c: mc, s: ms }) => ({
+        cid: mc.id, name: ms?.product_name || mc.title, option: '', qty: 1,
+        price: ms ? (cur0 === 'CNY' ? (ms.cny_price ?? '') : (ms.unit_price ?? '')) : '',
+        image: ms?.images?.[0] || mc.images?.[0] || null, image_owned: false, url: ms?.url || ''
+      })),
+      include_image: false
+    } : {
       lang: ls.get('sb_po_lang', 'kozh'),
       form_type: type || ls.get('sb_po_type', 'full'),
       number: nextPoNumber(), date: today(), due: '',
@@ -4765,10 +4993,10 @@ window.APP_CONFIG = {
       items: [{ name: s?.product_name || c.title, option: '', qty: s?.moq || 1, price: s ? (cur0 === 'CNY' ? s.cny_price : (s.unit_price ?? '')) : '' }],
       include_image: true
     };
-    d.items = d.items && d.items.length ? d.items : [{ name: c.title, option: '', qty: 1, price: '' }];
+    d.items = d.items && d.items.length ? d.items : [{ name: c ? c.title : '', option: '', qty: 1, price: '' }];
     const v = (x) => esc(x ?? '');
     const itemRow = (it, i) => `
-      <tr data-row>
+      <tr data-row data-cid="${v(it.cid)}">
         <td class="c">${i + 1}</td>
         <td class="po-img-cell">
           <button type="button" class="po-ph ${it.image ? 'has' : ''}" data-img-pick title="옵션 사진 넣기 (클릭, 끌어놓기, 또는 이 줄에서 Ctrl+V)">
@@ -4777,7 +5005,8 @@ window.APP_CONFIG = {
           <input type="hidden" name="it_image" value="${v(it.image)}">
           <input type="hidden" name="it_image_owned" value="${it.image_owned ? '1' : ''}">
         </td>
-        <td><input name="it_name" value="${v(it.name)}" placeholder="품명"></td>
+        <td><input name="it_name" value="${v(it.name)}" placeholder="품명">
+          <input name="it_url" class="it-url" value="${v(it.url)}" placeholder="상품 링크 (선택)" autocomplete="off"></td>
         <td><input name="it_option" value="${v(it.option)}" placeholder="색상 / 사이즈 / 규격"></td>
         <td><input name="it_qty" inputmode="numeric" value="${v(it.qty)}" style="text-align:right"></td>
         <td><input name="it_price" inputmode="decimal" value="${v(it.price)}" style="text-align:right"></td>
@@ -4788,7 +5017,7 @@ window.APP_CONFIG = {
     const form = openModal(`
       <form novalidate>
         <header class="modal-head">
-          <h2>🧾 ${order ? '발주서 수정' : '발주서 만들기'}</h2>
+          <h2>🧾 ${multi ? (order ? '샘플 발주서 수정' : '샘플 발주서 만들기') : (order ? '발주서 수정' : '발주서 만들기')}</h2>
           <div class="seg" role="radiogroup" aria-label="양식">
             <label><input type="radio" name="form_type" value="full" ${d.form_type !== 'simple' ? 'checked' : ''}><span>정식 발주서</span></label>
             <label><input type="radio" name="form_type" value="simple" ${d.form_type === 'simple' ? 'checked' : ''}><span>간이 발주서</span></label>
@@ -4853,7 +5082,7 @@ window.APP_CONFIG = {
           ${s && (s.images || []).length ? `<label class="check"><input type="checkbox" name="include_image" ${d.include_image !== false ? 'checked' : ''}> 소싱처 대표 이미지 넣기 <small style="font-weight:400;color:var(--muted)">(옵션 사진을 넣으면 생략됩니다)</small></label>` : ''}
         </div>
         <footer class="modal-foot">
-          <span class="muted" style="font-size:13px">${s ? `기준 소싱처: ${esc(s.site)}` : '소싱처 없이 작성'}</span>
+          <span class="muted" style="font-size:13px">${multi ? `상품 ${multiCands.length}개 · 각 상품의 최종 선택 소싱처 기준` : s ? `기준 소싱처: ${esc(s.site)}` : '소싱처 없이 작성'}</span>
           <span class="spacer"></span>
           <button type="button" class="btn" data-close>취소</button>
           <button type="submit" class="btn">저장</button>
@@ -4867,10 +5096,13 @@ window.APP_CONFIG = {
         qty: decOrNull(tr.querySelector('[name=it_qty]').value) ?? 0,
         price: decOrNull(tr.querySelector('[name=it_price]').value) ?? 0,
         image: tr.querySelector('[name=it_image]').value || null,
-        image_owned: tr.querySelector('[name=it_image_owned]').value === '1'
+        image_owned: tr.querySelector('[name=it_image_owned]').value === '1',
+        url: normUrl(tr.querySelector('[name=it_url]').value) || '',
+        cid: tr.dataset.cid || null
       })).filter((it) => it.name || it.qty || it.price || it.image);
       if (!items.length) throw new Error('품목을 1개 이상 입력해 주세요.');
       const data = {
+        kind: multi ? 'sample' : 'single',
         lang: f.lang, form_type: f.form_type === 'simple' ? 'simple' : 'full', number: f.number.trim() || nextPoNumber(), date: f.date, due: f.due, currency: f.currency,
         supplier: { name: f.sup_name.trim(), contact: f.sup_contact.trim(), phone: f.sup_phone.trim(), url: normUrl(f.sup_url) || '' },
         buyer: { name: f.buy_name.trim(), contact: f.buy_contact.trim(), phone: f.buy_phone.trim(), address: f.buy_address.trim(), biz: f.buy_biz.trim() },
@@ -4885,8 +5117,14 @@ window.APP_CONFIG = {
         if (error) throw error;
         saved = r;
       } else {
-        const { data: r, error } = await sb.from('orders').insert({ candidate_id: c.id, source_id: s?.id || null, po_number: data.number, data, ...stampNew() }).select().single();
-        if (error) throw error;
+        const row = multi
+          ? { candidate_id: null, candidate_ids: [...new Set(items.map((it) => it.cid).filter(Boolean).concat(multiCands.map((x) => x.id)))], kind: 'sample', source_id: null }
+          : { candidate_id: c.id, source_id: s?.id || null };
+        const { data: r, error } = await sb.from('orders').insert({ ...row, po_number: data.number, data, ...stampNew() }).select().single();
+        if (error) {
+          if (multi && /candidate_ids|kind|null value|not-null/i.test(error.message)) throw new Error('데이터베이스 업데이트가 필요합니다. 새 supabase-schema.sql을 실행해 주세요.');
+          throw error;
+        }
         saved = r;
       }
       if (f.save_company === 'on') {
@@ -4898,8 +5136,9 @@ window.APP_CONFIG = {
       const oldOwned = (order?.data?.items || []).filter((it) => it.image_owned).map((it) => it.image);
       await removeFiles([...oldOwned, ...poUploaded].filter((pth) => pth && !keep.has(pth)));
       await loadAll();
-      toast(`발주서 ${data.number}을(를) 저장했습니다.`);
-      state.tab = 'sources'; ls.set('sb_tab', 'sources');
+      toast(`${multi ? '샘플 ' : ''}발주서 ${data.number}을(를) 저장했습니다.`);
+      if (multi) { state.selecting = false; state.selected.clear(); renderSelBar(); }
+      else { state.tab = 'sources'; ls.set('sb_tab', 'sources'); }
       await route(false);
       if (submitter?.dataset.pdf) exportOrderPDF(state.orders.find((o) => o.id === saved.id) || saved);
     });
@@ -4940,7 +5179,10 @@ window.APP_CONFIG = {
 
     async function openImgPicker(btn, tr) {
       lastImgRow = tr;
-      const pool = [...new Set([...(s?.images || []), ...sourcesOf(c.id).flatMap((x) => x.images || []), ...(c.images || [])])].slice(0, 24);
+      const owners = multi ? multiCands : (c ? [c] : []);
+      const rowCand = multi && tr.dataset.cid ? owners.find((x) => x.id === tr.dataset.cid) : null;
+      const ordered = rowCand ? [rowCand, ...owners.filter((x) => x !== rowCand)] : owners;
+      const pool = [...new Set([...(s?.images || []), ...ordered.flatMap((oc) => [...sourcesOf(oc.id).flatMap((x) => x.images || []), ...(oc.images || [])])])].slice(0, 24);
       await ensureUrls(pool);
       closeMenu();
       const m = document.createElement('div');
@@ -5065,7 +5307,7 @@ window.APP_CONFIG = {
         </tr></thead>
         <tbody>
           ${(d.items || []).map((it, i) => `<tr>
-            <td class="c">${i + 1}</td>${pic ? `<td class="po-pic">${it.image && imgUrl(it.image) ? `<img src="${esc(imgUrl(it.image))}">` : ''}</td>` : ''}${brkCell(it.name)}${brkCell(it.option)}
+            <td class="c">${i + 1}</td>${pic ? `<td class="po-pic">${it.image && imgUrl(it.image) ? `<img src="${esc(imgUrl(it.image))}">` : ''}</td>` : ''}<td class="${needsBreak(it.name) ? 'brk' : ''}">${esc(it.name || '')}${it.url ? `<div class="po-url brk">${esc(it.url)}</div>` : ''}</td>${brkCell(it.option)}
             <td class="num">${fmtNum(it.qty || 0, 2)}</td><td class="num">${money(it.price || 0)}</td><td class="num">${money((it.qty || 0) * (it.price || 0))}</td>
           </tr>`).join('')}
         </tbody>
@@ -5082,6 +5324,7 @@ window.APP_CONFIG = {
     const c = state.candidates.find((x) => x.id === o.candidate_id);
     const s = state.sources.find((x) => x.id === o.source_id);
     const zh = d.lang !== 'ko';
+    const sample = isSampleOrder(o);
     const L = (ko, cn) => zh ? `${ko}<span class="zh">${cn}</span>` : ko;
     const money = moneyOf(d.currency);
     const t = orderTotals(d);
@@ -5095,7 +5338,7 @@ window.APP_CONFIG = {
       const sup = [d.supplier?.name, d.supplier?.contact, d.supplier?.phone].filter(Boolean).join(' · ');
       const html = `
         <div class="po-simple-head">
-          <h1>${zh ? '간이 발주서<span class="zh">简易采购单</span>' : '간이 발주서'}</h1>
+          <h1>${sample ? (zh ? '간이 샘플 발주서<span class="zh">简易样品采购单</span>' : '간이 샘플 발주서') : (zh ? '간이 발주서<span class="zh">简易采购单</span>' : '간이 발주서')}</h1>
           <div class="po-simple-meta">
             ${L('발주번호', '订单号')} <b>${esc(d.number || o.po_number)}</b><br>
             ${L('발주일', '下单日期')} ${esc(d.date || '')}${d.due ? ` · ${L('납기', '交货')} ${esc(d.due)}` : ''}
@@ -5108,13 +5351,13 @@ window.APP_CONFIG = {
         </table>
         ${poItemsTable(d, L, money, t)}
         ${imgBlock}`;
-      await exportPDF(html, `${d.number || o.po_number}_간이발주서`);
+      await exportPDF(html, `${d.number || o.po_number}_${sample ? '간이샘플발주서' : '간이발주서'}`);
       return;
     }
 
     const html = `
       <div class="po-top">
-        <h1>${zh ? '발주서<span class="zh">采 购 单</span>' : '발 주 서'}</h1>
+        <h1>${sample ? (zh ? '샘플 발주서<span class="zh">样 品 采 购 单</span>' : '샘플 발주서') : (zh ? '발주서<span class="zh">采 购 单</span>' : '발 주 서')}</h1>
         <table class="po-meta">
           <tr><th>${L('발주번호', '订单号')}</th><td>${esc(d.number || o.po_number)}</td></tr>
           <tr><th>${L('발주일', '下单日期')}</th><td>${esc(d.date || '')}</td></tr>
@@ -5145,7 +5388,7 @@ window.APP_CONFIG = {
         <div>${L('공급처 확인', '供应商确认')}<br>${esc(d.supplier?.name || '')}<span class="stamp">(${zh ? '인 / 盖章' : '인'})</span></div>
       </div>
       <p class="pdf-note" style="margin-top:10px">${o.created_by ? esc(o.created_by) + ' 작성' : ''}${o.updated_by && o.updated_by !== o.created_by ? ' · ' + esc(o.updated_by) + ' 수정' : ''}</p>`;
-    await exportPDF(html, `${d.number || o.po_number}_발주서`);
+    await exportPDF(html, `${d.number || o.po_number}_${sample ? '샘플발주서' : '발주서'}`);
   }
 })();
 
